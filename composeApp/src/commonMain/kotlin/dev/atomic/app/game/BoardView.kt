@@ -60,7 +60,7 @@ private fun Cell(
     val playable = level.isPlayable(pos)
     val owner = if (playable) state.board.ownerAt(pos) else Board.NO_OWNER
     val count = if (playable) state.board.countAt(pos) else 0
-    val ownerColor = if (owner != Board.NO_OWNER) Color(state.players[owner].color.toULong()) else Color.Transparent
+    val ownerColor = if (owner != Board.NO_OWNER) Color(state.players[owner].color.toInt()) else Color.Transparent
     val bg = if (!playable) Color(0xFF111111) else Color(0xFF22262B)
     val border = if (!playable) Color(0xFF222222) else Color(0xFF3A4048)
     Box(

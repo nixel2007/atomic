@@ -91,7 +91,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
                 "${w.name} wins!",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(w.color.toULong())
+                color = Color(w.color.toInt())
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -114,7 +114,7 @@ private fun TurnBar(state: GameState) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             state.players.forEach { p ->
                 val dim = !p.active
-                val col = Color(p.color.toULong())
+                val col = Color(p.color.toInt())
                 Box(
                     Modifier
                         .padding(end = 6.dp)
