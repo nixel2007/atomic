@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -5,12 +7,19 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(21)
+
     androidTarget {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            // Android bytecode stays at 17 — D8/R8 desugaring doesn't support higher yet.
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
-    jvm()
+    jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
 
     listOf(
         iosX64(),
@@ -36,7 +45,7 @@ kotlin {
 
 android {
     namespace = "dev.atomic.shared"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         minSdk = 24
     }
