@@ -91,6 +91,7 @@ object GameEngine {
     private fun resolveWave(owners: IntArray, counts: IntArray, cm: IntArray, level: Level) {
         val w = level.width
         while (true) {
+            if (hasSingleOwner(owners, counts)) return
             val batch = mutableListOf<Int>()
             for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) batch += i
             if (batch.isEmpty()) return
@@ -115,6 +116,7 @@ object GameEngine {
         val queue = ArrayDeque<Int>()
         for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) queue.addLast(i)
         while (queue.isNotEmpty()) {
+            if (hasSingleOwner(owners, counts)) return
             val i = queue.removeFirst()
             if (cm[i] == 0 || counts[i] < cm[i]) continue
             val srcOwner = owners[i]
@@ -124,6 +126,22 @@ object GameEngine {
                 if (cm[ni] > 0 && counts[ni] >= cm[ni]) queue.addLast(ni)
             }
         }
+    }
+
+    /**
+     * Once a single player owns every non-empty cell the match is decided and
+     * further cascades would only shuffle their own atoms around — with
+     * supercritical boards the cascade never terminates. Bail out early.
+     */
+    private fun hasSingleOwner(owners: IntArray, counts: IntArray): Boolean {
+        var seen = Board.NO_OWNER
+        for (i in counts.indices) {
+            if (counts[i] == 0) continue
+            val o = owners[i]
+            if (seen == Board.NO_OWNER) seen = o
+            else if (o != seen) return false
+        }
+        return seen != Board.NO_OWNER
     }
 
     private inline fun distribute(
