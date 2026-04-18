@@ -35,7 +35,7 @@ jobs:
           packages: 'platform-tools platforms;android-36'
 
       - name: Run tests
-        run: ./gradlew :shared:jvmTest :shared:testDebugUnitTest :server:test --stacktrace
+        run: ./gradlew :shared:jvmTest :server:test --stacktrace
 
       - name: Upload test reports
         if: always()

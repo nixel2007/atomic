@@ -6,13 +6,17 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
 }
 
 kotlin {
     jvmToolchain(21)
 
-    androidTarget {
+    androidLibrary {
+        namespace = "dev.atomic.app"
+        compileSdk = 36
+        minSdk = 24
+        withHostTestBuilder { }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -67,34 +71,6 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.cio)
-        }
-    }
-}
-
-android {
-    namespace = "dev.atomic.app"
-    compileSdk = 36
-    defaultConfig {
-        applicationId = "dev.atomic.app"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-    }
-    buildTypes {
-        getByName("debug") {
-            isMinifyEnabled = false
-        }
-        getByName("release") {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
