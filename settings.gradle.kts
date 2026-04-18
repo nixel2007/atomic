@@ -28,5 +28,5 @@ dependencyResolutionManagement {
 }
 
 include(":shared")
-include(":composeApp")
 include(":server")
+// :composeApp will be added in a follow-up commit
