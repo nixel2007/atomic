@@ -107,6 +107,27 @@ class GameEngineTest {
     }
 
     @Test
+    fun openingMoveIntoCorridorCellExplodesImmediately() {
+        // 3x3 with blocked cells leaving (1,0) as a dead-end of critical mass 1.
+        // Its only playable neighbour is (1,1). Placing the very first atom
+        // there must explode on turn 1, not wait for the opponent's move.
+        val corridor = Level(
+            id = "c", name = "c", width = 3, height = 3,
+            blocked = setOf(Pos(0, 0), Pos(2, 0), Pos(0, 1), Pos(2, 1))
+        )
+        for (mode in ExplosionMode.entries) {
+            var game = GameState.initial(corridor, GameSettings(mode), twoPlayers)
+            game = GameEngine.applyMove(game, Pos(1, 0))
+            assertEquals(0, game.board.countAt(Pos(1, 0)),
+                "corridor cell should be empty after opening explosion ($mode)")
+            assertEquals(Board.NO_OWNER, game.board.ownerAt(Pos(1, 0)))
+            assertEquals(1, game.board.countAt(Pos(1, 1)),
+                "atom should have moved to the single neighbour ($mode)")
+            assertEquals(0, game.board.ownerAt(Pos(1, 1)))
+        }
+    }
+
+    @Test
     fun winnerDeclaredWhenOnlyOneActivePlayerRemains() {
         // 2x2, two-player duel. Orchestrate until one is out.
         var game = newGame(Level.rectangular("s", "s", 2, 2))

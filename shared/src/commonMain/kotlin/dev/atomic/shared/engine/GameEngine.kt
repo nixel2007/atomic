@@ -116,7 +116,6 @@ object GameEngine {
         val w = level.width
         val h = level.height
         while (true) {
-            if (hasSingleOwner(owners, counts)) return
             val batch = mutableListOf<Int>()
             for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) batch += i
             if (batch.isEmpty()) return
@@ -129,6 +128,7 @@ object GameEngine {
                 distribute(batch[k], sources[k], owners, counts, level, w)
             }
             frames?.add(snapshot(w, h, owners, counts))
+            if (hasSingleOwner(owners, counts)) return
         }
     }
 
@@ -144,7 +144,6 @@ object GameEngine {
         val queue = ArrayDeque<Int>()
         for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) queue.addLast(i)
         while (queue.isNotEmpty()) {
-            if (hasSingleOwner(owners, counts)) return
             val i = queue.removeFirst()
             if (cm[i] == 0 || counts[i] < cm[i]) continue
             val srcOwner = owners[i]
@@ -154,13 +153,16 @@ object GameEngine {
                 if (cm[ni] > 0 && counts[ni] >= cm[ni]) queue.addLast(ni)
             }
             frames?.add(snapshot(w, h, owners, counts))
+            if (hasSingleOwner(owners, counts)) return
         }
     }
 
     /**
      * Once a single player owns every non-empty cell the match is decided and
      * further cascades would only shuffle their own atoms around — with
-     * supercritical boards the cascade never terminates. Bail out early.
+     * supercritical boards the cascade never terminates. Checked *after* each
+     * wave so the very first explosion (when only the mover has atoms) still
+     * fires; bailing out earlier would swallow opening-move corridor chains.
      */
     private fun hasSingleOwner(owners: IntArray, counts: IntArray): Boolean {
         var seen = Board.NO_OWNER
