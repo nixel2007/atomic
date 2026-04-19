@@ -19,10 +19,13 @@ android {
 
     defaultConfig {
         applicationId = "dev.atomic.app"
-        minSdk = 24
+        // minSdk 26 lets us ship a single adaptive-icon asset instead of the
+        // legacy PNG mipmap matrix — dropping API 24/25 loses <1% of devices
+        // and is standard for new apps as of 2024+.
+        minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     buildFeatures {

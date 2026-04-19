@@ -15,7 +15,7 @@ kotlin {
     androidLibrary {
         namespace = "dev.atomic.app"
         compileSdk = 36
-        minSdk = 24
+        minSdk = 26
         withHostTestBuilder { }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
