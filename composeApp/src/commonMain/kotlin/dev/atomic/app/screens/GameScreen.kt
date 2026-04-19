@@ -39,11 +39,14 @@ import dev.atomic.shared.engine.GameState
 import dev.atomic.shared.engine.Player
 import dev.atomic.shared.engine.PlayerKind
 import dev.atomic.shared.model.Level
+import dev.atomic.shared.model.Pos
 import kotlinx.coroutines.delay
 
 private val PALETTE = longArrayOf(
     0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L
 )
+
+private const val FRAME_DELAY_MS = 140L
 
 @Composable
 fun GameScreen(nav: Navigator, config: GameConfig) {
@@ -57,30 +60,57 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             )
         )
     }
+    var displayBoard by remember(config) { mutableStateOf(state.board) }
+    var animating by remember(config) { mutableStateOf(false) }
+    var pendingMove by remember(config) { mutableStateOf<Pos?>(null) }
+
+    // Keep the rendered board in sync when the game is reset.
+    LaunchedEffect(state) {
+        if (!animating) displayBoard = state.board
+    }
+
+    // Apply a queued move (human tap or bot pick) with a stepped cascade.
+    LaunchedEffect(pendingMove) {
+        val move = pendingMove ?: return@LaunchedEffect
+        if (!GameEngine.isLegalMove(state, move)) {
+            pendingMove = null
+            return@LaunchedEffect
+        }
+        animating = true
+        val result = GameEngine.applyMoveAnimated(state, move)
+        for ((i, frame) in result.frames.withIndex()) {
+            displayBoard = frame
+            if (i < result.frames.size - 1) delay(FRAME_DELAY_MS)
+        }
+        state = result.finalState
+        displayBoard = result.finalState.board
+        animating = false
+        pendingMove = null
+    }
 
     // AI auto-play when the current seat belongs to a bot.
-    LaunchedEffect(state) {
-        if (!state.isOver) {
-            val cp = state.currentPlayer
-            if (cp.kind == PlayerKind.Bot) {
-                delay(350)
-                val diff = cp.difficulty ?: return@LaunchedEffect
-                val move = Bot.of(diff).chooseMove(state)
-                state = GameEngine.applyMove(state, move)
-            }
+    LaunchedEffect(state, animating) {
+        if (animating || state.isOver) return@LaunchedEffect
+        val cp = state.currentPlayer
+        if (cp.kind == PlayerKind.Bot) {
+            delay(350)
+            val diff = cp.difficulty ?: return@LaunchedEffect
+            pendingMove = Bot.of(diff).chooseMove(state)
         }
     }
+
+    val renderState = remember(state, displayBoard) { state.copy(board = displayBoard) }
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         TurnBar(state)
         Spacer(Modifier.height(8.dp))
         BoardView(
-            state = state,
+            state = renderState,
             onCellTap = { pos ->
-                if (state.isOver) return@BoardView
+                if (animating || state.isOver) return@BoardView
                 if (state.currentPlayer.kind != PlayerKind.Human) return@BoardView
                 if (!GameEngine.isLegalMove(state, pos)) return@BoardView
-                state = GameEngine.applyMove(state, pos)
+                pendingMove = pos
             },
             modifier = Modifier.fillMaxWidth()
         )
