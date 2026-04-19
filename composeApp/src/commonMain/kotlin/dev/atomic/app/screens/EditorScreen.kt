@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -20,8 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.atomic.app.GameConfig
+import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
+import dev.atomic.app.Screen
 import dev.atomic.app.game.BoardView
+import dev.atomic.shared.engine.ExplosionMode
 import dev.atomic.shared.engine.GameSettings
 import dev.atomic.shared.engine.GameState
 import dev.atomic.shared.engine.Player
@@ -48,7 +56,11 @@ fun EditorScreen(nav: Navigator) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Level editor", fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -80,6 +92,22 @@ fun EditorScreen(nav: Navigator) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.back() }) { Text("Back") }
             OutlinedButton(onClick = { blocked = emptySet() }) { Text("Clear") }
+            Button(
+                onClick = {
+                    nav.go(
+                        Screen.Game(
+                            GameConfig(
+                                mode = GameMode.HotSeat,
+                                playerCount = 2,
+                                boardWidth = width,
+                                boardHeight = height,
+                                explosionMode = ExplosionMode.Wave,
+                                level = level
+                            )
+                        )
+                    )
+                }
+            ) { Text("Play") }
         }
     }
 }

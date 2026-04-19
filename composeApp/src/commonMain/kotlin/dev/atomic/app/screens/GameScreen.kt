@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -54,7 +55,8 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
     var state by remember(config) {
         mutableStateOf(
             GameState.initial(
-                level = Level.rectangular("p", "pickup", config.boardWidth, config.boardHeight),
+                level = config.level
+                    ?: Level.rectangular("p", "pickup", config.boardWidth, config.boardHeight),
                 settings = GameSettings(config.explosionMode),
                 players = players
             )
@@ -101,7 +103,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
 
     val renderState = remember(state, displayBoard) { state.copy(board = displayBoard) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+    Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
         TurnBar(state)
         Spacer(Modifier.height(8.dp))
         BoardView(

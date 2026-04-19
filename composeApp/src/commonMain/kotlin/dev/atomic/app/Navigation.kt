@@ -2,6 +2,7 @@ package dev.atomic.app
 
 import dev.atomic.shared.engine.BotDifficulty
 import dev.atomic.shared.engine.ExplosionMode
+import dev.atomic.shared.model.Level
 
 enum class GameMode { HotSeat, VsBot }
 
@@ -13,7 +14,10 @@ data class GameConfig(
     val explosionMode: ExplosionMode,
     val botDifficulty: BotDifficulty = BotDifficulty.Medium,
     /** Player seat controlled by the human in VsBot mode. */
-    val humanSeat: Int = 0
+    val humanSeat: Int = 0,
+    /** Optional custom level (from the editor). When null, a plain rectangular
+     *  level of the configured size is used. */
+    val level: Level? = null
 )
 
 sealed interface Screen {
