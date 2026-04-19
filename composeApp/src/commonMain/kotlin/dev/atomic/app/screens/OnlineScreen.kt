@@ -39,6 +39,8 @@ import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.online.LinkStatus
 import dev.atomic.app.online.MatchClientHolder
+import dev.atomic.app.settings.AppSettingsHolder
+import dev.atomic.app.settings.SettingKeys
 import dev.atomic.shared.engine.Board
 import dev.atomic.shared.engine.GameEngine
 import dev.atomic.shared.engine.GameSettings
@@ -64,9 +66,15 @@ private data class ChatLine(val seat: Int, val name: String, val color: Long, va
 @Composable
 fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
     val client = remember { MatchClientHolder.instance }
+    val settings = remember { AppSettingsHolder.instance }
 
-    var host by remember { mutableStateOf("ws://localhost:8080/game") }
-    var nickname by remember { mutableStateOf("Player") }
+    var host by remember {
+        mutableStateOf(settings.getString(
+            SettingKeys.RELAY_URL,
+            "wss://atomic-server-production.up.railway.app/game"
+        ))
+    }
+    var nickname by remember { mutableStateOf(settings.getString(SettingKeys.NICKNAME, "Player")) }
     var joinCode by remember { mutableStateOf("") }
     var createSeats by remember { mutableStateOf(2) }
 
@@ -109,12 +117,14 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     seat = msg.seat
                     players = msg.players
                     readySeats = msg.readySeats.toSet()
+                    client.setResumePoint(msg.code, nickname.ifBlank { "Player" })
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = false)
                 }
                 is ServerMessage.RoomJoined -> {
                     seat = msg.seat
                     players = msg.players
                     readySeats = msg.readySeats.toSet()
+                    client.setResumePoint(msg.code, nickname.ifBlank { "Player" })
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = msg.seat in msg.readySeats)
                 }
                 is ServerMessage.PlayerJoined -> {
@@ -125,6 +135,12 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     players = players.filter { it.index != msg.seat }
                     readySeats = readySeats - msg.seat
                     banner = "${playerName(msg.seat)} left"
+                }
+                is ServerMessage.PlayerDisconnected -> {
+                    banner = "${playerName(msg.seat)} lost connection (${msg.graceSeconds}s to rejoin)"
+                }
+                is ServerMessage.PlayerRejoined -> {
+                    banner = "${playerName(msg.seat)} reconnected"
                 }
                 is ServerMessage.PlayerReady -> {
                     readySeats = readySeats + msg.seat
@@ -195,6 +211,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 customLevel = customLevel,
                 onCreate = {
                     banner = null
+                    settings.putString(SettingKeys.RELAY_URL, host)
+                    settings.putString(SettingKeys.NICKNAME, nickname.ifBlank { "Player" })
                     client.connect(host)
                     suspendSendCreate(
                         client = client,
@@ -206,6 +224,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 },
                 onJoin = {
                     banner = null
+                    settings.putString(SettingKeys.RELAY_URL, host)
+                    settings.putString(SettingKeys.NICKNAME, nickname.ifBlank { "Player" })
                     client.connect(host)
                     suspendSendJoin(
                         client = client,

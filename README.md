@@ -76,7 +76,21 @@ CI produces the same artifact via the **Build APK** workflow
 
 ### iOS
 
-Open `iosApp/iosApp.xcodeproj` in Xcode and run, or build the framework:
+The `iosApp/` directory holds the SwiftUI wrapper. The Xcode project
+is generated from `iosApp/project.yml` by
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) so only the YAML is
+committed — run once:
+
+```sh
+brew install xcodegen
+cd iosApp && xcodegen generate && open iosApp.xcodeproj
+```
+
+A pre-build phase invokes
+`:composeApp:embedAndSignAppleFrameworkForXcode`, so no manual
+framework build is needed. See `iosApp/README.md` for signing setup.
+
+If you only want the framework (e.g. for a non-Xcode toolchain):
 
 ```sh
 ./gradlew :composeApp:linkDebugFrameworkIosArm64
@@ -99,8 +113,10 @@ collected when everyone leaves.
   Dockerfile, `docker-compose`, and a step-by-step fly.io deploy (free tier).
 
 Once the server is reachable, open **Online** in the app, enter the server
-URL (defaults to `ws://localhost:8080/game`), and either create a room
-(the app shows a 6-digit code) or join one with a code shared by a friend.
+URL (defaults to `wss://atomic-server-production.up.railway.app/game` — a
+free Railway-hosted instance; swap in your own deploy or `ws://localhost:8080/game`
+for a local server), and either create a room (the app shows a 6-digit code)
+or join one with a code shared by a friend.
 
 ## Wire protocol
 
@@ -156,4 +172,4 @@ The server is authoritative: it validates every move through the same
 
 ## License
 
-TBD.
+MIT — see [LICENSE](LICENSE).

@@ -74,6 +74,12 @@ sealed interface ServerMessage {
     data class PlayerLeft(val seat: Int) : ServerMessage
 
     @Serializable
+    data class PlayerDisconnected(val seat: Int, val graceSeconds: Int) : ServerMessage
+
+    @Serializable
+    data class PlayerRejoined(val seat: Int) : ServerMessage
+
+    @Serializable
     data class PlayerReady(val seat: Int) : ServerMessage
 
     @Serializable

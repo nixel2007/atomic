@@ -33,9 +33,10 @@ fun Routing.gameWebSocket(rooms: RoomManager) {
             val room = session.currentRoom
             val seat = session.currentSeat
             if (room != null && seat >= 0) {
-                val empty = room.leave(seat)
+                // Socket drop: hold the seat open for a grace window so the
+                // same nickname can rejoin without losing their place.
+                room.disconnect(seat) { rooms.evict(room) }
                 session.detach()
-                if (empty) rooms.evict(room)
             }
         }
     }
@@ -43,8 +44,13 @@ fun Routing.gameWebSocket(rooms: RoomManager) {
 
 private suspend fun handle(session: Session, message: ClientMessage, rooms: RoomManager) {
     when (message) {
-        is ClientMessage.CreateRoom ->
+        is ClientMessage.CreateRoom -> {
+            if (!session.createLimiter.tryAcquire()) {
+                session.send(ServerMessage.ErrorMessage(ErrorCode.BadRequest, "too many rooms created, slow down"))
+                return
+            }
             rooms.create(message.level, message.settings, message.seats, session, message.nickname)
+        }
 
         is ClientMessage.JoinRoom -> {
             val ok = rooms.join(message.code, session, message.nickname)
@@ -64,6 +70,12 @@ private suspend fun handle(session: Session, message: ClientMessage, rooms: Room
             if (empty) rooms.evict(room)
         }
 
-        is ClientMessage.Chat -> session.currentRoom?.chat(session.currentSeat, message.text)
+        is ClientMessage.Chat -> {
+            if (!session.chatLimiter.tryAcquire()) {
+                session.send(ServerMessage.ErrorMessage(ErrorCode.BadRequest, "chat rate limit: 5 messages / 10s"))
+                return
+            }
+            session.currentRoom?.chat(session.currentSeat, message.text)
+        }
     }
 }
