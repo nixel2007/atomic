@@ -21,12 +21,26 @@ android {
         applicationId = "dev.atomic.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildFeatures {
         compose = true
+    }
+
+    // Shared keystore committed to the repo so local builds and CI produce
+    // APKs with the same signature. Without this, Android refuses to install
+    // a new build over one signed with a different key — hence the "conflicts
+    // with existing package" error users saw when switching between local
+    // debug and CI-produced release APKs.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("androidApp/keystore/shared-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {

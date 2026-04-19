@@ -27,7 +27,7 @@ fun App() {
                 Screen.Menu -> MainMenuScreen(nav)
                 is Screen.Setup -> SetupScreen(nav, s.mode)
                 is Screen.Game -> GameScreen(nav, s.config)
-                Screen.Online -> OnlineScreen(nav)
+                is Screen.Online -> OnlineScreen(nav, s.customLevel)
                 Screen.Editor -> EditorScreen(nav)
             }
         }

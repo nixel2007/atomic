@@ -108,6 +108,9 @@ fun EditorScreen(nav: Navigator) {
                     )
                 }
             ) { Text("Play") }
+            Button(onClick = { nav.go(Screen.Online(customLevel = level)) }) {
+                Text("Play online")
+            }
         }
     }
 }

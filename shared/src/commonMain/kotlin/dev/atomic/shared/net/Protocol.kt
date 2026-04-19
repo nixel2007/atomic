@@ -54,7 +54,8 @@ sealed interface ServerMessage {
         val code: String,
         val seat: Int,
         val players: List<Player>,
-        val maxSeats: Int
+        val maxSeats: Int,
+        val readySeats: List<Int> = emptyList()
     ) : ServerMessage
 
     @Serializable
@@ -62,7 +63,8 @@ sealed interface ServerMessage {
         val code: String,
         val seat: Int,
         val players: List<Player>,
-        val maxSeats: Int
+        val maxSeats: Int,
+        val readySeats: List<Int> = emptyList()
     ) : ServerMessage
 
     @Serializable
@@ -70,6 +72,9 @@ sealed interface ServerMessage {
 
     @Serializable
     data class PlayerLeft(val seat: Int) : ServerMessage
+
+    @Serializable
+    data class PlayerReady(val seat: Int) : ServerMessage
 
     @Serializable
     data class GameStarted(val state: GameState) : ServerMessage

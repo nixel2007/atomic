@@ -37,7 +37,7 @@ class RoomManager {
     suspend fun join(code: String, session: Session, nickname: String): Boolean {
         val room = rooms[code] ?: return false
         val seat = room.admit(session, nickname) ?: return false
-        session.send(ServerMessage.RoomJoined(room.code, seat, room.players, room.maxSeats))
+        session.send(ServerMessage.RoomJoined(room.code, seat, room.players, room.maxSeats, room.readySeats()))
         room.announceJoined(seat)
         return true
     }
@@ -68,6 +68,8 @@ class Room(
 
     val players: List<Player> get() = occupants.values.sortedBy { it.player.index }.map { it.player }
 
+    fun readySeats(): List<Int> = occupants.values.filter { it.ready }.map { it.player.index }.sorted()
+
     /**
      * Reserves a seat for [session]. Returns the seat index, or null if the
      * room is full or a game is already running. Does not send any messages
@@ -95,6 +97,7 @@ class Room(
     suspend fun markReady(seat: Int) {
         val startState: GameState? = mutex.withLock {
             val occ = occupants[seat] ?: return
+            if (occ.ready) return
             occ.ready = true
             if (occupants.size == maxSeats && occupants.values.all { it.ready }) {
                 val snapshot = GameState.initial(level, settings, players)
@@ -102,6 +105,7 @@ class Room(
                 snapshot
             } else null
         }
+        broadcast(ServerMessage.PlayerReady(seat))
         if (startState != null) broadcast(ServerMessage.GameStarted(startState))
     }
 
