@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
@@ -117,22 +118,43 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(12.dp))
-        if (state.isOver) {
-            val w = state.players[state.winner!!]
-            Text(
-                "${w.name} wins!",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(w.color.toInt())
-            )
-        }
-        Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.back() }) { Text("Back") }
-            Button(onClick = {
-                state = GameState.initial(state.level, state.settings, buildPlayers(config))
-            }) { Text("New game") }
         }
+    }
+
+    if (state.isOver) {
+        val w = state.players[state.winner!!]
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .padding(end = 10.dp)
+                            .width(22.dp).height(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(w.color.toInt()))
+                    )
+                    Text("${w.name} wins!", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column {
+                    Text("Final turn count: ${state.turnsPlayed}")
+                    val eliminated = state.players.count { !it.active }
+                    if (eliminated > 0) Text("Players eliminated: $eliminated")
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    state = GameState.initial(state.level, state.settings, buildPlayers(config))
+                }) { Text("Play again") }
+            },
+            dismissButton = {
+                TextButton(onClick = { nav.back() }) { Text("Back to menu") }
+            }
+        )
     }
 }
 
