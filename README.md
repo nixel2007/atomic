@@ -1,0 +1,145 @@
+# Atomic
+
+Kotlin Multiplatform clone of the classic **Chain Reaction** game (known on
+Nokia phones as *Atomic*). Runs on Android, iOS and Desktop from a single
+Compose Multiplatform UI; online play goes through a tiny Ktor relay server.
+
+## Features
+
+- **Chain Reaction rules:** 2–4 players, place an atom in an empty or own
+  cell, reach critical mass to explode and convert neighbours. Corridors on
+  blocked-cell levels legitimately have critical mass 1.
+- **Explosion modes:** *Wave* (simultaneous tick-based) or *Recursive*,
+  selectable per match.
+- **Local modes (no internet):** hot-seat and vs bot with three difficulties
+  (Easy/Random, Medium/Heuristic, Hard/Minimax depth 2).
+- **Online play:** 6-digit room codes via a lightweight relay server.
+- **Level editor:** configurable size and blocked cells.
+- **Animated cascades:** each explosion wave is rendered as a step so the
+  board reaction is actually visible.
+
+## Project layout
+
+```
+atomic/
+├── shared/          # KMP: engine, AI, protocol (pure Kotlin, no UI)
+├── composeApp/      # KMP library: shared Compose UI (Android/iOS/Desktop)
+├── androidApp/      # Android application wrapper
+├── server/          # Ktor relay server (JVM)
+├── gradle/          # Version catalog + wrapper
+└── docs/            # Extra docs (see docs/RELAY.md)
+```
+
+`shared` is pure Kotlin and is depended on by both the app and the server,
+so the wire protocol types are literally the same classes on both ends.
+
+## Requirements
+
+- **JDK 21** (Temurin recommended). Android compilation targets bytecode 17
+  because D8/R8 desugaring doesn't support higher yet.
+- **Android SDK 36** with `build-tools;36.0.0` for APK builds.
+- **Xcode 15+** for iOS (not required for other platforms).
+- The Gradle wrapper is checked in — no system Gradle needed.
+
+## Building & running
+
+### Desktop
+
+```sh
+./gradlew :composeApp:run
+```
+
+### Android
+
+Build a debug APK and install it on a connected device:
+
+```sh
+./gradlew :androidApp:installDebug
+```
+
+Or a release APK (signed with the debug key for local use):
+
+```sh
+./gradlew :androidApp:assembleRelease
+# => androidApp/build/outputs/apk/release/androidApp-release.apk
+```
+
+CI produces the same artifact via the **Build APK** workflow
+(`workflow_dispatch` trigger, 1-day artifact retention).
+
+### iOS
+
+Open `iosApp/iosApp.xcodeproj` in Xcode and run, or build the framework:
+
+```sh
+./gradlew :composeApp:linkDebugFrameworkIosArm64
+```
+
+### Tests
+
+```sh
+./gradlew :shared:jvmTest :server:test
+```
+
+## Online play
+
+Atomic uses a small **relay server** to shuttle moves between clients.
+The server holds no durable state — rooms live in memory and are garbage
+collected when everyone leaves.
+
+- **Run it locally:** `./gradlew :server:run` (listens on `localhost:8080`)
+- **Docker / cloud deploy:** see **[docs/RELAY.md](docs/RELAY.md)** for a
+  Dockerfile, `docker-compose`, and a step-by-step fly.io deploy (free tier).
+
+Once the server is reachable, open **Online** in the app, enter the server
+URL (defaults to `ws://localhost:8080/game`), and either create a room
+(the app shows a 6-digit code) or join one with a code shared by a friend.
+
+## Wire protocol
+
+Messages are JSON with a class discriminator field `"t"`. See
+`shared/src/commonMain/kotlin/dev/atomic/shared/net/Protocol.kt` for the
+full sealed hierarchy. In short:
+
+| Direction | Message       | Purpose |
+|-----------|---------------|---------|
+| C → S     | `CreateRoom`  | new room with level/settings/seats |
+| C → S     | `JoinRoom`    | join by 6-digit code |
+| C → S     | `SetReady`    | signal readiness in the lobby |
+| C → S     | `MakeMove`    | place an atom at `Pos` |
+| C → S     | `LeaveRoom`   | voluntarily leave |
+| C → S     | `Chat`        | free-form text |
+| S → C     | `RoomCreated` / `RoomJoined` | your seat + current players |
+| S → C     | `PlayerJoined` / `PlayerLeft` | lobby deltas |
+| S → C     | `GameStarted` | initial `GameState` when all seated & ready |
+| S → C     | `GameUpdated` | authoritative state after every move |
+| S → C     | `GameOver`    | winning seat |
+| S → C     | `ErrorMessage`| room-not-found, bad move, etc. |
+
+The server is authoritative: it validates every move through the same
+`GameEngine.applyMove` that runs locally, then broadcasts the full
+`GameState`. Clients don't replay history.
+
+## Architecture notes
+
+- `shared/engine/GameEngine.kt` is the single source of truth for game
+  logic. `applyMoveAnimated` returns per-wave snapshots so the UI can
+  animate cascades; `applyMove` is the fast path used by bots and the
+  server.
+- `shared/ai/` has three bots behind a common `Bot` interface.
+- `composeApp/` is **not** an Android application — under AGP 9 + KMP the
+  `com.android.application` plugin can no longer be combined with the
+  multiplatform plugin, so `:composeApp` is a multiplatform **library**
+  (Android AAR + iOS framework + Desktop JAR), and `:androidApp` wraps it
+  with a pure Android `MainActivity`.
+
+## CI
+
+- **Tests** (`.github/workflows/tests.yml`) — runs on push/PR/manual,
+  executes `:shared:jvmTest` and `:server:test`.
+- **Build APK** (`.github/workflows/build-apk.yml`) — manual trigger,
+  produces a release APK as a 1-day artifact.
+
+## License
+
+TBD.
