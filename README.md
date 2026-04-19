@@ -166,4 +166,4 @@ The server is authoritative: it validates every move through the same
 
 ## License
 
-TBD.
+MIT — see [LICENSE](LICENSE).
