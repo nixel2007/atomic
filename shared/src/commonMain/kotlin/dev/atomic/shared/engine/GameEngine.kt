@@ -25,17 +25,18 @@ object GameEngine {
         return result
     }
 
-    fun applyMove(state: GameState, p: Pos): GameState = apply(state, p, collectFrames = false).finalState
+    fun applyMove(state: GameState, p: Pos): GameState = apply(state, p, collectWaves = false).finalState
 
     /**
      * Same as [applyMove] but also returns the board snapshot after each
-     * explosion wave so the UI can animate the cascade. The first frame is
-     * the board right after placement (before any explosion); the last
-     * frame equals [MoveResult.finalState.board].
+     * cascade wave in [MoveResult.waves]. Deterministic — the trace is a
+     * property of the simulation, not of any presentation layer. Callers
+     * that only need the resulting state should use [applyMove], which is
+     * cheaper because it allocates no intermediate snapshots.
      */
-    fun applyMoveAnimated(state: GameState, p: Pos): MoveResult = apply(state, p, collectFrames = true)
+    fun applyMoveTraced(state: GameState, p: Pos): MoveResult = apply(state, p, collectWaves = true)
 
-    private fun apply(state: GameState, p: Pos, collectFrames: Boolean): MoveResult {
+    private fun apply(state: GameState, p: Pos, collectWaves: Boolean): MoveResult {
         require(isLegalMove(state, p)) {
             "illegal move at $p for player ${state.currentPlayerIndex}"
         }
@@ -52,10 +53,10 @@ object GameEngine {
         owners[placedIdx] = player
         counts[placedIdx] += 1
 
-        val frames: MutableList<Board>? = if (collectFrames) mutableListOf() else null
-        frames?.add(snapshot(w, h, owners, counts))
+        val waves: MutableList<Board>? = if (collectWaves) mutableListOf() else null
+        waves?.add(snapshot(w, h, owners, counts))
 
-        resolveExplosions(owners, counts, cm, level, state.settings.explosionMode, frames)
+        resolveExplosions(owners, counts, cm, level, state.settings.explosionMode, waves)
 
         val newBoard = Board(w, h, owners.toList(), counts.toList())
 
@@ -86,7 +87,7 @@ object GameEngine {
             turnsPlayed = state.turnsPlayed + 1,
             winner = winner
         )
-        return MoveResult(frames ?: emptyList(), finalState)
+        return MoveResult(waves ?: emptyList(), finalState)
     }
 
     private fun snapshot(w: Int, h: Int, owners: IntArray, counts: IntArray): Board =
@@ -98,11 +99,11 @@ object GameEngine {
         cm: IntArray,
         level: Level,
         mode: ExplosionMode,
-        frames: MutableList<Board>?
+        waves: MutableList<Board>?
     ) {
         when (mode) {
-            ExplosionMode.Wave -> resolveWave(owners, counts, cm, level, frames)
-            ExplosionMode.Recursive -> resolveRecursive(owners, counts, cm, level, frames)
+            ExplosionMode.Wave -> resolveWave(owners, counts, cm, level, waves)
+            ExplosionMode.Recursive -> resolveRecursive(owners, counts, cm, level, waves)
         }
     }
 
@@ -111,7 +112,7 @@ object GameEngine {
         counts: IntArray,
         cm: IntArray,
         level: Level,
-        frames: MutableList<Board>?
+        waves: MutableList<Board>?
     ) {
         val w = level.width
         val h = level.height
@@ -127,7 +128,7 @@ object GameEngine {
             for (k in batch.indices) {
                 distribute(batch[k], sources[k], owners, counts, level, w)
             }
-            frames?.add(snapshot(w, h, owners, counts))
+            waves?.add(snapshot(w, h, owners, counts))
             if (hasSingleOwner(owners, counts)) return
         }
     }
@@ -137,7 +138,7 @@ object GameEngine {
         counts: IntArray,
         cm: IntArray,
         level: Level,
-        frames: MutableList<Board>?
+        waves: MutableList<Board>?
     ) {
         val w = level.width
         val h = level.height
@@ -152,7 +153,7 @@ object GameEngine {
             distribute(i, srcOwner, owners, counts, level, w) { ni ->
                 if (cm[ni] > 0 && counts[ni] >= cm[ni]) queue.addLast(ni)
             }
-            frames?.add(snapshot(w, h, owners, counts))
+            waves?.add(snapshot(w, h, owners, counts))
             if (hasSingleOwner(owners, counts)) return
         }
     }

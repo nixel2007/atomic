@@ -130,9 +130,10 @@ The server is authoritative: it validates every move through the same
 ## Architecture notes
 
 - `shared/engine/GameEngine.kt` is the single source of truth for game
-  logic. `applyMoveAnimated` returns per-wave snapshots so the UI can
-  animate cascades; `applyMove` is the fast path used by bots and the
-  server.
+  logic. `applyMoveTraced` returns the per-wave snapshots of a move's
+  cascade (used by the client to animate and available to anyone that
+  wants a replayable trace); `applyMove` is the fast path used by bots
+  and the server.
 - `shared/ai/` has three bots behind a common `Bot` interface.
 - `composeApp/` is **not** an Android application — under AGP 9 + KMP the
   `com.android.application` plugin can no longer be combined with the

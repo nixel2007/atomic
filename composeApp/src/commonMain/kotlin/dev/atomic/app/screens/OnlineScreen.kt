@@ -155,16 +155,16 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         }
     }
 
-    // Animate each GameUpdated by replaying applyMoveAnimated against the
+    // Animate each GameUpdated by replaying applyMoveTraced against the
     // previous state using the server-provided lastMove.
     LaunchedEffect(pendingUpdate) {
         val upd = pendingUpdate ?: return@LaunchedEffect
         val prev = previousState ?: upd.state
         animating = true
-        val result = GameEngine.applyMoveAnimated(prev, upd.lastMove)
-        for ((i, frame) in result.frames.withIndex()) {
-            displayBoard = frame
-            if (i < result.frames.size - 1) delay(FRAME_DELAY_MS)
+        val result = GameEngine.applyMoveTraced(prev, upd.lastMove)
+        for ((i, wave) in result.waves.withIndex()) {
+            displayBoard = wave
+            if (i < result.waves.size - 1) delay(FRAME_DELAY_MS)
         }
         displayBoard = upd.state.board
         previousState = upd.state

@@ -79,10 +79,10 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             return@LaunchedEffect
         }
         animating = true
-        val result = GameEngine.applyMoveAnimated(state, move)
-        for ((i, frame) in result.frames.withIndex()) {
-            displayBoard = frame
-            if (i < result.frames.size - 1) delay(FRAME_DELAY_MS)
+        val result = GameEngine.applyMoveTraced(state, move)
+        for ((i, wave) in result.waves.withIndex()) {
+            displayBoard = wave
+            if (i < result.waves.size - 1) delay(FRAME_DELAY_MS)
         }
         state = result.finalState
         displayBoard = result.finalState.board
