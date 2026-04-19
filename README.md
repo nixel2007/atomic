@@ -99,8 +99,10 @@ collected when everyone leaves.
   Dockerfile, `docker-compose`, and a step-by-step fly.io deploy (free tier).
 
 Once the server is reachable, open **Online** in the app, enter the server
-URL (defaults to `ws://localhost:8080/game`), and either create a room
-(the app shows a 6-digit code) or join one with a code shared by a friend.
+URL (defaults to `wss://atomic-server-production.up.railway.app/game` — a
+free Railway-hosted instance; swap in your own deploy or `ws://localhost:8080/game`
+for a local server), and either create a room (the app shows a 6-digit code)
+or join one with a code shared by a friend.
 
 ## Wire protocol
 

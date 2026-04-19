@@ -25,16 +25,29 @@ import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
 import dev.atomic.app.Screen
+import dev.atomic.app.settings.AppSettingsHolder
+import dev.atomic.app.settings.SettingKeys
 import dev.atomic.shared.engine.BotDifficulty
 import dev.atomic.shared.engine.ExplosionMode
 
 @Composable
 fun SetupScreen(nav: Navigator, mode: GameMode) {
-    var players by remember { mutableStateOf(2) }
-    var width by remember { mutableStateOf(6) }
-    var height by remember { mutableStateOf(9) }
-    var explosion by remember { mutableStateOf(ExplosionMode.Wave) }
-    var difficulty by remember { mutableStateOf(BotDifficulty.Medium) }
+    val settings = remember { AppSettingsHolder.instance }
+    var players by remember { mutableStateOf(settings.getInt(SettingKeys.LAST_PLAYERS, 2).coerceIn(2, 4)) }
+    var width by remember { mutableStateOf(settings.getInt(SettingKeys.LAST_BOARD_W, 6)) }
+    var height by remember { mutableStateOf(settings.getInt(SettingKeys.LAST_BOARD_H, 9)) }
+    var explosion by remember {
+        mutableStateOf(
+            ExplosionMode.entries.firstOrNull { it.name == settings.getString(SettingKeys.LAST_EXPLOSION, "") }
+                ?: ExplosionMode.Wave
+        )
+    }
+    var difficulty by remember {
+        mutableStateOf(
+            BotDifficulty.entries.firstOrNull { it.name == settings.getString(SettingKeys.LAST_DIFFICULTY, "") }
+                ?: BotDifficulty.Medium
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -94,6 +107,11 @@ fun SetupScreen(nav: Navigator, mode: GameMode) {
             OutlinedButton(onClick = { nav.back() }) { Text("Back") }
             Button(
                 onClick = {
+                    settings.putInt(SettingKeys.LAST_PLAYERS, players)
+                    settings.putInt(SettingKeys.LAST_BOARD_W, width)
+                    settings.putInt(SettingKeys.LAST_BOARD_H, height)
+                    settings.putString(SettingKeys.LAST_EXPLOSION, explosion.name)
+                    settings.putString(SettingKeys.LAST_DIFFICULTY, difficulty.name)
                     nav.go(Screen.Game(
                         GameConfig(
                             mode = mode,
