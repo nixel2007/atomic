@@ -321,6 +321,7 @@ private fun StatusLine(status: LinkStatus, error: String?) {
         LinkStatus.Idle -> "not connected" to Color.Gray
         LinkStatus.Connecting -> "connecting…" to Color(0xFFFDD835)
         LinkStatus.Connected -> "connected" to Color(0xFF66BB6A)
+        LinkStatus.Reconnecting -> "reconnecting…" to Color(0xFFFDD835)
         LinkStatus.Closed -> "disconnected" to Color.Gray
         LinkStatus.Failed -> "failed: ${error ?: "connection error"}" to Color(0xFFE57373)
     }

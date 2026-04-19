@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -167,20 +168,22 @@ class MatchClient {
                     resume?.let {
                         s.send(Frame.Text(ClientMessage.JoinRoom(it.code, it.nickname).encode()))
                     }
-                    val sender = launch {
-                        for (msg in localOutbox) s.send(Frame.Text(msg.encode()))
-                    }
-                    try {
-                        for (frame in s.incoming) {
-                            if (frame is Frame.Text) {
-                                val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
-                                if (parsed != null) _events.emit(parsed)
-                            }
+                    coroutineScope {
+                        val sender = launch {
+                            for (msg in localOutbox) s.send(Frame.Text(msg.encode()))
                         }
-                    } finally {
-                        sender.cancel()
-                        localOutbox.close()
-                        session = null
+                        try {
+                            for (frame in s.incoming) {
+                                if (frame is Frame.Text) {
+                                    val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
+                                    if (parsed != null) _events.emit(parsed)
+                                }
+                            }
+                        } finally {
+                            sender.cancel()
+                            localOutbox.close()
+                            session = null
+                        }
                     }
                 }
                 false
