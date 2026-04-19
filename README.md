@@ -76,7 +76,21 @@ CI produces the same artifact via the **Build APK** workflow
 
 ### iOS
 
-Open `iosApp/iosApp.xcodeproj` in Xcode and run, or build the framework:
+The `iosApp/` directory holds the SwiftUI wrapper. The Xcode project
+is generated from `iosApp/project.yml` by
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) so only the YAML is
+committed — run once:
+
+```sh
+brew install xcodegen
+cd iosApp && xcodegen generate && open iosApp.xcodeproj
+```
+
+A pre-build phase invokes
+`:composeApp:embedAndSignAppleFrameworkForXcode`, so no manual
+framework build is needed. See `iosApp/README.md` for signing setup.
+
+If you only want the framework (e.g. for a non-Xcode toolchain):
 
 ```sh
 ./gradlew :composeApp:linkDebugFrameworkIosArm64
