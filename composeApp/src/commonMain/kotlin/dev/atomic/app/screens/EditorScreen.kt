@@ -29,6 +29,7 @@ import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
 import dev.atomic.app.Screen
 import dev.atomic.app.game.BoardView
+import dev.atomic.shared.engine.BotDifficulty
 import dev.atomic.shared.engine.ExplosionMode
 import dev.atomic.shared.engine.GameSettings
 import dev.atomic.shared.engine.GameState
@@ -41,6 +42,10 @@ fun EditorScreen(nav: Navigator) {
     var width by remember { mutableStateOf(6) }
     var height by remember { mutableStateOf(9) }
     var blocked by remember { mutableStateOf<Set<Pos>>(emptySet()) }
+    var players by remember { mutableStateOf(2) }
+    var mode by remember { mutableStateOf(GameMode.HotSeat) }
+    var difficulty by remember { mutableStateOf(BotDifficulty.Medium) }
+    var explosion by remember { mutableStateOf(ExplosionMode.Wave) }
     val level = remember(width, height, blocked) {
         Level(id = "draft", name = "Draft", width = width, height = height, blocked = blocked)
     }
@@ -88,6 +93,55 @@ fun EditorScreen(nav: Navigator) {
         Text("Critical mass sample: centre = ${level.criticalMass(Pos(width / 2, height / 2))}, " +
             "corner = ${level.criticalMass(Pos(0, 0))}")
 
+        Text("Players")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(2, 3, 4).forEach { n ->
+                FilterChip(
+                    selected = players == n,
+                    onClick = { players = n },
+                    label = { Text("$n") }
+                )
+            }
+        }
+
+        Text("Mode")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = mode == GameMode.HotSeat,
+                onClick = { mode = GameMode.HotSeat },
+                label = { Text("Hot seat") }
+            )
+            FilterChip(
+                selected = mode == GameMode.VsBot,
+                onClick = { mode = GameMode.VsBot },
+                label = { Text("Vs bot") }
+            )
+        }
+
+        if (mode == GameMode.VsBot) {
+            Text("Bot difficulty")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BotDifficulty.entries.forEach { d ->
+                    FilterChip(
+                        selected = difficulty == d,
+                        onClick = { difficulty = d },
+                        label = { Text(d.name) }
+                    )
+                }
+            }
+        }
+
+        Text("Explosions")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ExplosionMode.entries.forEach { e ->
+                FilterChip(
+                    selected = explosion == e,
+                    onClick = { explosion = e },
+                    label = { Text(e.name) }
+                )
+            }
+        }
+
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.back() }) { Text("Back") }
@@ -97,11 +151,12 @@ fun EditorScreen(nav: Navigator) {
                     nav.go(
                         Screen.Game(
                             GameConfig(
-                                mode = GameMode.HotSeat,
-                                playerCount = 2,
+                                mode = mode,
+                                playerCount = players,
                                 boardWidth = width,
                                 boardHeight = height,
-                                explosionMode = ExplosionMode.Wave,
+                                explosionMode = explosion,
+                                botDifficulty = difficulty,
                                 level = level
                             )
                         )
