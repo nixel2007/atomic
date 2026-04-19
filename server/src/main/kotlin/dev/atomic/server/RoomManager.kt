@@ -22,9 +22,14 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
-class RoomManager {
+class RoomManager(
+    private val maxRooms: Int = 500,
+    private val idleTtlMillis: Long = 60 * 60 * 1000L // 1 hour
+) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val rnd = Random.Default
+
+    val roomCount: Int get() = rooms.size
 
     suspend fun create(
         level: Level,
@@ -32,14 +37,32 @@ class RoomManager {
         seats: Int,
         host: Session,
         nickname: String
-    ): Room {
+    ): Room? {
         require(seats in 2..4)
+        if (rooms.size >= maxRooms) {
+            host.send(ServerMessage.ErrorMessage(ErrorCode.InternalError, "server at capacity, try again later"))
+            return null
+        }
         val code = newCode()
         val room = Room(code, level, settings, seats)
         rooms[code] = room
         val seat = room.admit(host, nickname)
         host.send(ServerMessage.RoomCreated(code, seat!!, room.players, room.maxSeats))
         return room
+    }
+
+    /** Evict rooms that haven't had any activity in [idleTtlMillis]. */
+    fun sweepIdle(now: Long = System.currentTimeMillis()): Int {
+        var evicted = 0
+        for ((code, room) in rooms) {
+            if (now - room.lastActivityAt > idleTtlMillis) {
+                if (rooms.remove(code, room)) {
+                    room.close()
+                    evicted++
+                }
+            }
+        }
+        return evicted
     }
 
     /**
@@ -86,6 +109,13 @@ class Room(
     private var state: GameState? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    @Volatile var lastActivityAt: Long = System.currentTimeMillis()
+        private set
+
+    private fun touch() {
+        lastActivityAt = System.currentTimeMillis()
+    }
+
     data class Occupant(
         var session: Session?,
         val player: Player,
@@ -115,6 +145,7 @@ class Room(
         )
         occupants[seat] = Occupant(session, player)
         session.attach(this, seat)
+        touch()
         seat
     }
 
@@ -130,6 +161,7 @@ class Room(
         target.graceJob = null
         target.session = session
         session.attach(this, target.player.index)
+        touch()
         target.player.index
     }
 
@@ -155,6 +187,7 @@ class Room(
         }
         broadcast(ServerMessage.PlayerReady(seat))
         if (startState != null) broadcast(ServerMessage.GameStarted(startState))
+        touch()
     }
 
     suspend fun applyMove(seat: Int, pos: Pos) {
@@ -181,6 +214,7 @@ class Room(
         } else {
             broadcast(ServerMessage.GameUpdated(updated, pos, seat))
         }
+        touch()
     }
 
     /**
@@ -222,6 +256,7 @@ class Room(
 
     suspend fun chat(fromSeat: Int, text: String) {
         broadcast(ServerMessage.Chat(fromSeat, text.take(280)))
+        touch()
     }
 
     fun close() {

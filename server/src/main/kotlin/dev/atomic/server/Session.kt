@@ -13,6 +13,12 @@ class Session(private val ws: WebSocketSession) {
     val currentRoom: Room? get() = room
     val currentSeat: Int get() = seat
 
+    /** 3 room creations per minute per connection. */
+    val createLimiter: RateLimiter = RateLimiter(maxPerWindow = 3, windowMillis = 60_000)
+
+    /** 5 chat messages per 10 seconds per connection. */
+    val chatLimiter: RateLimiter = RateLimiter(maxPerWindow = 5, windowMillis = 10_000)
+
     fun attach(room: Room, seat: Int) {
         this.room = room
         this.seat = seat
