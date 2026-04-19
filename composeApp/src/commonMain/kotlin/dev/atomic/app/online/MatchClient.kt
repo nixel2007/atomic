@@ -12,7 +12,10 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Connection lifecycle exposed to the UI. */
@@ -30,11 +34,13 @@ enum class LinkStatus { Idle, Connecting, Connected, Closed, Failed }
  * [HttpClient] and at most one live session — calling [connect] while a
  * session is already open closes the old one first.
  *
- * Everything is hot: connect once per screen, [send] from anywhere on the
- * owning coroutine, observe [events] and [status] as flows.
+ * The internal coroutine scope is process-owned ([SupervisorJob] +
+ * [Dispatchers.Default]), so the connection survives Activity recreation and
+ * minimise-then-resume on Android. Callers never dispose the client.
  */
-class MatchClient(private val scope: CoroutineScope) {
+class MatchClient {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val http: HttpClient = HttpClient { install(WebSockets) }
 
     private val _status = MutableStateFlow(LinkStatus.Idle)
@@ -48,57 +54,87 @@ class MatchClient(private val scope: CoroutineScope) {
 
     private var session: DefaultClientWebSocketSession? = null
     private var runner: Job? = null
-    // Buffered so UI can enqueue before the session is up; drained as soon as
-    // we're connected.
-    private val outbox = Channel<ClientMessage>(Channel.BUFFERED)
+    // Re-created on each connect so stale messages from a previous session
+    // don't leak into a new one.
+    private var outbox: Channel<ClientMessage> = Channel(Channel.BUFFERED)
 
     fun connect(url: String) {
-        runner?.cancel()
-        _lastError.value = null
+        // Flip status synchronously so scheduleAfterConnect observers don't
+        // mistake a leftover terminal state from a previous attempt for the
+        // current one.
         _status.value = LinkStatus.Connecting
-        runner = scope.launch {
-            try {
-                http.webSocketSession(urlString = url).also { s ->
-                    session = s
-                    _status.value = LinkStatus.Connected
-                    val sender = launch {
-                        for (msg in outbox) s.send(Frame.Text(msg.encode()))
-                    }
-                    try {
-                        for (frame in s.incoming) {
-                            if (frame is Frame.Text) {
-                                val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
-                                if (parsed != null) _events.emit(parsed)
-                            }
+        _lastError.value = null
+        scope.launch {
+            runner?.cancelAndJoin()
+            val localOutbox = Channel<ClientMessage>(Channel.BUFFERED)
+            outbox = localOutbox
+            runner = scope.launch {
+                try {
+                    http.webSocketSession(urlString = url).also { s ->
+                        session = s
+                        _status.value = LinkStatus.Connected
+                        val sender = launch {
+                            for (msg in localOutbox) s.send(Frame.Text(msg.encode()))
                         }
-                    } finally {
-                        sender.cancel()
-                        session = null
-                        _status.value = LinkStatus.Closed
+                        try {
+                            for (frame in s.incoming) {
+                                if (frame is Frame.Text) {
+                                    val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
+                                    if (parsed != null) _events.emit(parsed)
+                                }
+                            }
+                        } finally {
+                            sender.cancel()
+                            localOutbox.close()
+                            session = null
+                            _status.value = LinkStatus.Closed
+                        }
                     }
+                } catch (t: Throwable) {
+                    session = null
+                    _lastError.value = t.message ?: t::class.simpleName ?: "connection failed"
+                    _status.value = LinkStatus.Failed
                 }
-            } catch (t: Throwable) {
-                session = null
-                _lastError.value = t.message ?: t::class.simpleName ?: "connection failed"
-                _status.value = LinkStatus.Failed
             }
         }
     }
 
-    suspend fun send(message: ClientMessage) {
-        outbox.send(message)
-    }
-
-    fun disconnect() {
-        runner?.cancel()
+    fun send(message: ClientMessage) {
         scope.launch {
-            runCatching { session?.close() }
-            session = null
+            runCatching { outbox.send(message) }
         }
     }
 
-    fun shutdown() {
-        disconnect()
-        http.close()
+    /**
+     * Waits for the current connect attempt to reach a terminal state
+     * ([LinkStatus.Connected], [LinkStatus.Failed] or [LinkStatus.Closed]) and,
+     * if it succeeded, runs [block] on the client's own scope. Use this so UI
+     * callbacks can "connect + send CreateRoom/JoinRoom" without owning a
+     * coroutine themselves.
+     *
+     * [connect] flips the status to [LinkStatus.Connecting] synchronously,
+     * so calling this immediately after connect correctly waits for the new
+     * attempt, not any leftover terminal value from a previous one.
+     */
+    fun scheduleAfterConnect(block: suspend MatchClient.() -> Unit) {
+        scope.launch {
+            val terminal = status.first {
+                it == LinkStatus.Connected || it == LinkStatus.Failed || it == LinkStatus.Closed
+            }
+            if (terminal == LinkStatus.Connected) block()
+        }
     }
+
+    fun disconnect() {
+        scope.launch {
+            runCatching { session?.close() }
+            runner?.cancel()
+            session = null
+        }
+    }
+}
+
+/** Process-wide singleton. Created lazily on first access; never disposed. */
+object MatchClientHolder {
+    val instance: MatchClient by lazy { MatchClient() }
 }

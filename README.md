@@ -57,12 +57,19 @@ Build a debug APK and install it on a connected device:
 ./gradlew :androidApp:installDebug
 ```
 
-Or a release APK (signed with the debug key for local use):
+Or a release APK (signed with the committed shared debug keystore so local
+builds and CI produce install-compatible APKs):
 
 ```sh
 ./gradlew :androidApp:assembleRelease
 # => androidApp/build/outputs/apk/release/androidApp-release.apk
 ```
+
+`androidApp/keystore/shared-debug.keystore` is intentionally checked in —
+without it, Android refuses to install a build over one signed with a
+different key ("conflicts with existing package"). Since this project has
+no Play Store release track, a shared debug-style key is fine; swap in a
+real release keystore when that changes.
 
 CI produces the same artifact via the **Build APK** workflow
 (`workflow_dispatch` trigger, 1-day artifact retention).

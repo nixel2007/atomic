@@ -24,7 +24,8 @@ sealed interface Screen {
     data object Menu : Screen
     data class Setup(val mode: GameMode) : Screen
     data class Game(val config: GameConfig) : Screen
-    data object Online : Screen
+    /** [customLevel] pre-fills the "create room" form when launched from the editor. */
+    data class Online(val customLevel: Level? = null) : Screen
     data object Editor : Screen
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -21,13 +22,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.online.LinkStatus
-import dev.atomic.app.online.MatchClient
+import dev.atomic.app.online.MatchClientHolder
 import dev.atomic.shared.engine.Board
 import dev.atomic.shared.engine.GameEngine
 import dev.atomic.shared.engine.GameSettings
@@ -50,8 +49,6 @@ import dev.atomic.shared.model.Pos
 import dev.atomic.shared.net.ClientMessage
 import dev.atomic.shared.net.ServerMessage
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 private const val FRAME_DELAY_MS = 140L
 
@@ -62,11 +59,11 @@ private sealed interface Stage {
     data class GameOver(val state: GameState, val winnerSeat: Int) : Stage
 }
 
+private data class ChatLine(val seat: Int, val name: String, val color: Long, val text: String)
+
 @Composable
-fun OnlineScreen(nav: Navigator) {
-    val scope = rememberCoroutineScope()
-    val client = remember { MatchClient(scope) }
-    DisposableEffect(client) { onDispose { client.shutdown() } }
+fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
+    val client = remember { MatchClientHolder.instance }
 
     var host by remember { mutableStateOf("ws://localhost:8080/game") }
     var nickname by remember { mutableStateOf("Player") }
@@ -76,7 +73,10 @@ fun OnlineScreen(nav: Navigator) {
     var stage by remember { mutableStateOf<Stage>(Stage.Idle) }
     var seat by remember { mutableStateOf(-1) }
     var players by remember { mutableStateOf<List<Player>>(emptyList()) }
+    var readySeats by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var banner by remember { mutableStateOf<String?>(null) }
+    var chatLines by remember { mutableStateOf<List<ChatLine>>(emptyList()) }
+    var chatDraft by remember { mutableStateOf("") }
 
     // Animation state for cascades driven by server GameUpdated events.
     var displayBoard by remember { mutableStateOf<Board?>(null) }
@@ -91,10 +91,16 @@ fun OnlineScreen(nav: Navigator) {
         stage = Stage.Idle
         seat = -1
         players = emptyList()
+        readySeats = emptySet()
+        chatLines = emptyList()
+        chatDraft = ""
         previousState = null
         displayBoard = null
         pendingUpdate = null
     }
+
+    fun playerName(s: Int): String = players.firstOrNull { it.index == s }?.name ?: "seat $s"
+    fun playerColor(s: Int): Long = players.firstOrNull { it.index == s }?.color ?: 0xFFFFFFFFL
 
     LaunchedEffect(client) {
         client.events.collect { msg ->
@@ -102,12 +108,14 @@ fun OnlineScreen(nav: Navigator) {
                 is ServerMessage.RoomCreated -> {
                     seat = msg.seat
                     players = msg.players
+                    readySeats = msg.readySeats.toSet()
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = false)
                 }
                 is ServerMessage.RoomJoined -> {
                     seat = msg.seat
                     players = msg.players
-                    stage = Stage.Lobby(msg.code, msg.maxSeats, ready = false)
+                    readySeats = msg.readySeats.toSet()
+                    stage = Stage.Lobby(msg.code, msg.maxSeats, ready = msg.seat in msg.readySeats)
                 }
                 is ServerMessage.PlayerJoined -> {
                     players = (players.filter { it.index != msg.player.index } + msg.player)
@@ -115,7 +123,11 @@ fun OnlineScreen(nav: Navigator) {
                 }
                 is ServerMessage.PlayerLeft -> {
                     players = players.filter { it.index != msg.seat }
-                    banner = "Seat ${msg.seat} left"
+                    readySeats = readySeats - msg.seat
+                    banner = "${playerName(msg.seat)} left"
+                }
+                is ServerMessage.PlayerReady -> {
+                    readySeats = readySeats + msg.seat
                 }
                 is ServerMessage.GameStarted -> {
                     players = msg.state.players
@@ -130,15 +142,21 @@ fun OnlineScreen(nav: Navigator) {
                     displayBoard = msg.state.board
                     stage = Stage.GameOver(msg.state, msg.winnerSeat)
                 }
-                is ServerMessage.Chat -> Unit
+                is ServerMessage.Chat -> {
+                    chatLines = (chatLines + ChatLine(
+                        seat = msg.fromSeat,
+                        name = playerName(msg.fromSeat),
+                        color = playerColor(msg.fromSeat),
+                        text = msg.text
+                    )).takeLast(50)
+                }
                 is ServerMessage.ErrorMessage -> banner = msg.message
             }
         }
     }
 
     // Animate each GameUpdated by replaying applyMoveAnimated against the
-    // previous state using the server-provided lastMove. The engine is
-    // deterministic, so the final board matches msg.state.board.
+    // previous state using the server-provided lastMove.
     LaunchedEffect(pendingUpdate) {
         val upd = pendingUpdate ?: return@LaunchedEffect
         val prev = previousState ?: upd.state
@@ -174,79 +192,101 @@ fun OnlineScreen(nav: Navigator) {
                 nickname = nickname, onNicknameChange = { nickname = it },
                 seats = createSeats, onSeatsChange = { createSeats = it },
                 joinCode = joinCode, onJoinCodeChange = { joinCode = it },
+                customLevel = customLevel,
                 onCreate = {
                     banner = null
                     client.connect(host)
-                    scope.launch {
-                        if (awaitReady(client)) {
-                            client.send(
-                                ClientMessage.CreateRoom(
-                                    level = Level.rectangular("p", "pickup", 6, 9),
-                                    settings = GameSettings(),
-                                    seats = createSeats,
-                                    nickname = nickname.ifBlank { "Player" }
-                                )
-                            )
-                        }
-                    }
+                    suspendSendCreate(
+                        client = client,
+                        level = customLevel
+                            ?: Level.rectangular("p", "pickup", 6, 9),
+                        seats = createSeats,
+                        nickname = nickname.ifBlank { "Player" }
+                    )
                 },
                 onJoin = {
                     banner = null
                     client.connect(host)
-                    scope.launch {
-                        if (awaitReady(client)) {
-                            client.send(
-                                ClientMessage.JoinRoom(
-                                    code = joinCode.filter { it.isDigit() }.take(6),
-                                    nickname = nickname.ifBlank { "Player" }
-                                )
-                            )
-                        }
-                    }
+                    suspendSendJoin(
+                        client = client,
+                        code = joinCode.filter { it.isDigit() }.take(6),
+                        nickname = nickname.ifBlank { "Player" }
+                    )
                 },
                 onBack = { nav.back() }
             )
 
-            is Stage.Lobby -> LobbyPanel(
-                code = s.code,
-                seat = seat,
-                players = players,
-                maxSeats = s.maxSeats,
-                ready = s.ready,
-                onReady = {
-                    stage = s.copy(ready = true)
-                    scope.launch { client.send(ClientMessage.SetReady) }
-                },
-                onLeave = {
-                    scope.launch { client.send(ClientMessage.LeaveRoom) }
-                    client.disconnect()
-                    resetToIdle()
-                }
-            )
+            is Stage.Lobby -> {
+                LobbyPanel(
+                    code = s.code,
+                    seat = seat,
+                    players = players,
+                    readySeats = readySeats,
+                    maxSeats = s.maxSeats,
+                    ready = s.ready,
+                    onReady = {
+                        stage = s.copy(ready = true)
+                        client.send(ClientMessage.SetReady)
+                    },
+                    onLeave = {
+                        client.send(ClientMessage.LeaveRoom)
+                        client.disconnect()
+                        resetToIdle()
+                    }
+                )
+                ChatPanel(
+                    lines = chatLines,
+                    draft = chatDraft,
+                    selfSeat = seat,
+                    onDraftChange = { chatDraft = it },
+                    onSend = {
+                        val text = chatDraft.trim()
+                        if (text.isNotEmpty()) {
+                            client.send(ClientMessage.Chat(text))
+                            chatDraft = ""
+                        }
+                    }
+                )
+            }
 
-            is Stage.Playing -> PlayingPanel(
-                state = s.state,
-                displayBoard = displayBoard ?: s.state.board,
-                seat = seat,
-                animating = animating,
-                onTap = { pos ->
-                    if (animating || s.state.isOver) return@PlayingPanel
-                    if (s.state.currentPlayerIndex != seat) return@PlayingPanel
-                    if (!GameEngine.isLegalMove(s.state, pos)) return@PlayingPanel
-                    scope.launch { client.send(ClientMessage.MakeMove(pos)) }
-                },
-                onLeave = {
-                    scope.launch { client.send(ClientMessage.LeaveRoom) }
-                    client.disconnect()
-                    resetToIdle()
-                }
-            )
+            is Stage.Playing -> {
+                PlayingPanel(
+                    state = s.state,
+                    displayBoard = displayBoard ?: s.state.board,
+                    seat = seat,
+                    animating = animating,
+                    onTap = { pos ->
+                        if (animating || s.state.isOver) return@PlayingPanel
+                        if (s.state.currentPlayerIndex != seat) return@PlayingPanel
+                        if (!GameEngine.isLegalMove(s.state, pos)) return@PlayingPanel
+                        client.send(ClientMessage.MakeMove(pos))
+                    },
+                    onLeave = {
+                        client.send(ClientMessage.LeaveRoom)
+                        client.disconnect()
+                        resetToIdle()
+                    }
+                )
+                ChatPanel(
+                    lines = chatLines,
+                    draft = chatDraft,
+                    selfSeat = seat,
+                    onDraftChange = { chatDraft = it },
+                    onSend = {
+                        val text = chatDraft.trim()
+                        if (text.isNotEmpty()) {
+                            client.send(ClientMessage.Chat(text))
+                            chatDraft = ""
+                        }
+                    }
+                )
+            }
 
             is Stage.GameOver -> GameOverPanel(
                 state = s.state,
                 winnerSeat = s.winnerSeat,
                 onBack = {
-                    scope.launch { client.send(ClientMessage.LeaveRoom) }
+                    client.send(ClientMessage.LeaveRoom)
                     client.disconnect()
                     resetToIdle()
                 }
@@ -273,6 +313,7 @@ private fun IdlePanel(
     nickname: String, onNicknameChange: (String) -> Unit,
     seats: Int, onSeatsChange: (Int) -> Unit,
     joinCode: String, onJoinCodeChange: (String) -> Unit,
+    customLevel: Level?,
     onCreate: () -> Unit,
     onJoin: () -> Unit,
     onBack: () -> Unit
@@ -293,6 +334,13 @@ private fun IdlePanel(
     )
 
     Text("Create room", fontWeight = FontWeight.Bold)
+    if (customLevel != null) {
+        Text(
+            "Using your custom ${customLevel.width}×${customLevel.height} level " +
+                "(${customLevel.blocked.size} blocked).",
+            color = Color(0xFF90CAF9)
+        )
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(2, 3, 4).forEach { n ->
             FilterChip(
@@ -310,7 +358,7 @@ private fun IdlePanel(
     Text("Join room", fontWeight = FontWeight.Bold)
     OutlinedTextField(
         value = joinCode,
-        onValueChange = onJoinCodeChange,
+        onValueChange = { onJoinCodeChange(it.filter { c -> c.isDigit() }.take(6)) },
         label = { Text("6-digit code") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
@@ -330,6 +378,7 @@ private fun LobbyPanel(
     code: String,
     seat: Int,
     players: List<Player>,
+    readySeats: Set<Int>,
     maxSeats: Int,
     ready: Boolean,
     onReady: () -> Unit,
@@ -342,7 +391,10 @@ private fun LobbyPanel(
         color = Color.Gray
     )
 
-    Text("Seats (${players.size}/$maxSeats)", fontWeight = FontWeight.Bold)
+    Text(
+        "Seats (${players.size}/$maxSeats) — ${readySeats.size}/$maxSeats ready",
+        fontWeight = FontWeight.Bold
+    )
     players.forEach { p ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -353,9 +405,18 @@ private fun LobbyPanel(
                     .background(Color(p.color.toInt()))
             )
             Text(
-                if (p.index == seat) "${p.name} (you)" else p.name,
-                fontWeight = if (p.index == seat) FontWeight.Bold else FontWeight.Normal
+                text = buildString {
+                    append(p.name)
+                    if (p.index == seat) append(" (you)")
+                },
+                fontWeight = if (p.index == seat) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.padding(end = 8.dp)
             )
+            if (p.index in readySeats) {
+                Text("ready", color = Color(0xFF66BB6A), fontWeight = FontWeight.Bold)
+            } else {
+                Text("waiting", color = Color.Gray)
+            }
         }
     }
 
@@ -429,11 +490,86 @@ private fun GameOverPanel(
     Button(onClick = onBack) { Text("Back to lobby") }
 }
 
-/** Suspends until the WebSocket session is Connected. Returns false if the
- *  link failed or closed before becoming ready. */
-private suspend fun awaitReady(client: MatchClient): Boolean {
-    val final = client.status.first { s ->
-        s == LinkStatus.Connected || s == LinkStatus.Failed || s == LinkStatus.Closed
+@Composable
+private fun ChatPanel(
+    lines: List<ChatLine>,
+    draft: String,
+    selfSeat: Int,
+    onDraftChange: (String) -> Unit,
+    onSend: () -> Unit
+) {
+    Spacer(Modifier.height(4.dp))
+    Text("Chat", fontWeight = FontWeight.Bold)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF1A1D21))
+            .verticalScroll(rememberScrollState())
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        if (lines.isEmpty()) {
+            Text("No messages yet.", color = Color.Gray, fontSize = 12.sp)
+        } else {
+            lines.forEach { line ->
+                Row {
+                    Text(
+                        text = line.name + (if (line.seat == selfSeat) " (you)" else "") + ": ",
+                        color = Color(line.color.toInt()),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                    Text(line.text, color = Color.White, fontSize = 13.sp)
+                }
+            }
+        }
     }
-    return final == LinkStatus.Connected
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { onDraftChange(it.take(280)) },
+            placeholder = { Text("Say something…") },
+            singleLine = true,
+            modifier = Modifier.weight(1f)
+        )
+        Button(onClick = onSend, enabled = draft.isNotBlank()) { Text("Send") }
+    }
+}
+
+/** Spawns a coroutine on [MatchClientHolder.instance]'s own scope (via its
+ *  [send] / [connect] lambdas) that waits for a Connected link then fires the
+ *  CreateRoom request. Kept out of the composable body so scope ownership is
+ *  unambiguous. */
+private fun suspendSendCreate(
+    client: dev.atomic.app.online.MatchClient,
+    level: Level,
+    seats: Int,
+    nickname: String
+) {
+    client.scheduleAfterConnect {
+        send(
+            ClientMessage.CreateRoom(
+                level = level,
+                settings = GameSettings(),
+                seats = seats,
+                nickname = nickname
+            )
+        )
+    }
+}
+
+private fun suspendSendJoin(
+    client: dev.atomic.app.online.MatchClient,
+    code: String,
+    nickname: String
+) {
+    client.scheduleAfterConnect {
+        send(ClientMessage.JoinRoom(code = code, nickname = nickname))
+    }
 }

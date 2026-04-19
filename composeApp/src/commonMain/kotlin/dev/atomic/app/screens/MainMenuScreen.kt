@@ -31,7 +31,7 @@ fun MainMenuScreen(nav: Navigator) {
         Spacer(Modifier.height(48.dp))
         MenuButton("Hot seat") { nav.go(Screen.Setup(GameMode.HotSeat)) }
         MenuButton("Vs AI") { nav.go(Screen.Setup(GameMode.VsBot)) }
-        MenuButton("Online") { nav.go(Screen.Online) }
+        MenuButton("Online") { nav.go(Screen.Online()) }
         MenuButton("Level editor") { nav.go(Screen.Editor) }
     }
 }
