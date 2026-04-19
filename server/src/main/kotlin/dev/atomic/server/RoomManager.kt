@@ -30,14 +30,14 @@ class RoomManager {
         val room = Room(code, level, settings, seats)
         rooms[code] = room
         val seat = room.admit(host, nickname)
-        host.send(ServerMessage.RoomCreated(code, seat!!, room.players))
+        host.send(ServerMessage.RoomCreated(code, seat!!, room.players, room.maxSeats))
         return room
     }
 
     suspend fun join(code: String, session: Session, nickname: String): Boolean {
         val room = rooms[code] ?: return false
         val seat = room.admit(session, nickname) ?: return false
-        session.send(ServerMessage.RoomJoined(room.code, seat, room.players))
+        session.send(ServerMessage.RoomJoined(room.code, seat, room.players, room.maxSeats))
         room.announceJoined(seat)
         return true
     }

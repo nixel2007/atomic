@@ -53,14 +53,16 @@ sealed interface ServerMessage {
     data class RoomCreated(
         val code: String,
         val seat: Int,
-        val players: List<Player>
+        val players: List<Player>,
+        val maxSeats: Int
     ) : ServerMessage
 
     @Serializable
     data class RoomJoined(
         val code: String,
         val seat: Int,
-        val players: List<Player>
+        val players: List<Player>,
+        val maxSeats: Int
     ) : ServerMessage
 
     @Serializable
