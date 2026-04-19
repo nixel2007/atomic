@@ -117,12 +117,14 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     seat = msg.seat
                     players = msg.players
                     readySeats = msg.readySeats.toSet()
+                    client.setResumePoint(msg.code, nickname.ifBlank { "Player" })
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = false)
                 }
                 is ServerMessage.RoomJoined -> {
                     seat = msg.seat
                     players = msg.players
                     readySeats = msg.readySeats.toSet()
+                    client.setResumePoint(msg.code, nickname.ifBlank { "Player" })
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = msg.seat in msg.readySeats)
                 }
                 is ServerMessage.PlayerJoined -> {
@@ -133,6 +135,12 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     players = players.filter { it.index != msg.seat }
                     readySeats = readySeats - msg.seat
                     banner = "${playerName(msg.seat)} left"
+                }
+                is ServerMessage.PlayerDisconnected -> {
+                    banner = "${playerName(msg.seat)} lost connection (${msg.graceSeconds}s to rejoin)"
+                }
+                is ServerMessage.PlayerRejoined -> {
+                    banner = "${playerName(msg.seat)} reconnected"
                 }
                 is ServerMessage.PlayerReady -> {
                     readySeats = readySeats + msg.seat

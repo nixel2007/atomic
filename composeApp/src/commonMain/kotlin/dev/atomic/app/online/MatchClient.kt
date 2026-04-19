@@ -1,6 +1,7 @@
 package dev.atomic.app.online
 
 import dev.atomic.shared.net.ClientMessage
+import dev.atomic.shared.net.ErrorCode
 import dev.atomic.shared.net.ServerMessage
 import dev.atomic.shared.net.decodeServerMessage
 import dev.atomic.shared.net.encode
@@ -17,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -26,8 +28,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/** Connection lifecycle exposed to the UI. */
-enum class LinkStatus { Idle, Connecting, Connected, Closed, Failed }
+/**
+ * Connection lifecycle exposed to the UI.
+ *
+ * [Reconnecting] is a transient state between waves of a retrying connection
+ * loop — the client has stored resume info and will keep trying to rejoin
+ * the same room until [LinkStatus.Connected] succeeds or [MAX_RETRIES]
+ * attempts are exhausted.
+ */
+enum class LinkStatus { Idle, Connecting, Connected, Reconnecting, Closed, Failed }
+
+/** Where to resume after an unexpected socket drop. */
+private data class ResumePoint(val url: String, val code: String, val nickname: String)
 
 /**
  * Tiny WebSocket wrapper around the relay protocol. Owns a single
@@ -37,6 +49,11 @@ enum class LinkStatus { Idle, Connecting, Connected, Closed, Failed }
  * The internal coroutine scope is process-owned ([SupervisorJob] +
  * [Dispatchers.Default]), so the connection survives Activity recreation and
  * minimise-then-resume on Android. Callers never dispose the client.
+ *
+ * Auto-reconnect: once [setResumePoint] is called (typically on RoomCreated /
+ * RoomJoined), a socket drop triggers exponential-backoff reconnect attempts
+ * that re-send `JoinRoom(code, nickname)` on success. The server-side grace
+ * window keeps the seat reserved while this plays out.
  */
 class MatchClient {
 
@@ -54,55 +71,37 @@ class MatchClient {
 
     private var session: DefaultClientWebSocketSession? = null
     private var runner: Job? = null
-    // Re-created on each connect so stale messages from a previous session
-    // don't leak into a new one.
     private var outbox: Channel<ClientMessage> = Channel(Channel.BUFFERED)
 
-    fun connect(url: String) {
-        // Flip status synchronously so scheduleAfterConnect observers don't
-        // mistake a leftover terminal state from a previous attempt for the
-        // current one.
-        _status.value = LinkStatus.Connecting
-        _lastError.value = null
+    @Volatile private var lastUrl: String? = null
+    @Volatile private var resume: ResumePoint? = null
+    @Volatile private var intentionalClose = false
+
+    init {
+        // Collect RoomNotFound so a stale resume doesn't drive the loop forever.
         scope.launch {
-            runner?.cancelAndJoin()
-            val localOutbox = Channel<ClientMessage>(Channel.BUFFERED)
-            outbox = localOutbox
-            runner = scope.launch {
-                try {
-                    http.webSocketSession(urlString = url).also { s ->
-                        session = s
-                        _status.value = LinkStatus.Connected
-                        val sender = launch {
-                            for (msg in localOutbox) s.send(Frame.Text(msg.encode()))
-                        }
-                        try {
-                            for (frame in s.incoming) {
-                                if (frame is Frame.Text) {
-                                    val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
-                                    if (parsed != null) _events.emit(parsed)
-                                }
-                            }
-                        } finally {
-                            sender.cancel()
-                            localOutbox.close()
-                            session = null
-                            _status.value = LinkStatus.Closed
-                        }
-                    }
-                } catch (t: Throwable) {
-                    session = null
-                    _lastError.value = t.message ?: t::class.simpleName ?: "connection failed"
-                    _status.value = LinkStatus.Failed
+            events.collect { msg ->
+                if (msg is ServerMessage.ErrorMessage && msg.code == ErrorCode.RoomNotFound) {
+                    resume = null
                 }
             }
         }
     }
 
-    fun send(message: ClientMessage) {
+    fun connect(url: String) {
+        intentionalClose = false
+        resume = null
+        lastUrl = url
+        _status.value = LinkStatus.Connecting
+        _lastError.value = null
         scope.launch {
-            runCatching { outbox.send(message) }
+            runner?.cancelAndJoin()
+            runner = scope.launch { connectionLoop() }
         }
+    }
+
+    fun send(message: ClientMessage) {
+        scope.launch { runCatching { outbox.send(message) } }
     }
 
     /**
@@ -111,10 +110,6 @@ class MatchClient {
      * if it succeeded, runs [block] on the client's own scope. Use this so UI
      * callbacks can "connect + send CreateRoom/JoinRoom" without owning a
      * coroutine themselves.
-     *
-     * [connect] flips the status to [LinkStatus.Connecting] synchronously,
-     * so calling this immediately after connect correctly waits for the new
-     * attempt, not any leftover terminal value from a previous one.
      */
     fun scheduleAfterConnect(block: suspend MatchClient.() -> Unit) {
         scope.launch {
@@ -125,11 +120,99 @@ class MatchClient {
         }
     }
 
+    /**
+     * Record a room to rejoin on any future unexpected drop. Call this once
+     * the server confirms the seat (after RoomCreated / RoomJoined arrives).
+     */
+    fun setResumePoint(code: String, nickname: String) {
+        val url = lastUrl ?: return
+        resume = ResumePoint(url, code, nickname)
+    }
+
+    /** Call before an intentional leave so the client doesn't try to rejoin. */
+    fun clearResumePoint() {
+        resume = null
+    }
+
     fun disconnect() {
+        intentionalClose = true
+        resume = null
         scope.launch {
             runCatching { session?.close() }
             runner?.cancel()
             session = null
+            _status.value = LinkStatus.Closed
+        }
+    }
+
+    private suspend fun connectionLoop() {
+        var attempt = 0
+        var reconnecting = false
+        while (true) {
+            val url = resume?.url ?: lastUrl ?: return
+            if (reconnecting) {
+                _status.value = LinkStatus.Reconnecting
+                delay(backoffMillis(attempt))
+            } else {
+                _status.value = LinkStatus.Connecting
+            }
+            _lastError.value = null
+            val localOutbox = Channel<ClientMessage>(Channel.BUFFERED)
+            outbox = localOutbox
+            val errored = try {
+                http.webSocketSession(urlString = url).also { s ->
+                    session = s
+                    _status.value = LinkStatus.Connected
+                    attempt = 0
+                    resume?.let {
+                        s.send(Frame.Text(ClientMessage.JoinRoom(it.code, it.nickname).encode()))
+                    }
+                    val sender = launch {
+                        for (msg in localOutbox) s.send(Frame.Text(msg.encode()))
+                    }
+                    try {
+                        for (frame in s.incoming) {
+                            if (frame is Frame.Text) {
+                                val parsed = runCatching { decodeServerMessage(frame.readText()) }.getOrNull()
+                                if (parsed != null) _events.emit(parsed)
+                            }
+                        }
+                    } finally {
+                        sender.cancel()
+                        localOutbox.close()
+                        session = null
+                    }
+                }
+                false
+            } catch (t: Throwable) {
+                session = null
+                _lastError.value = t.message ?: t::class.simpleName ?: "connection failed"
+                true
+            }
+            if (intentionalClose) {
+                _status.value = LinkStatus.Closed
+                return
+            }
+            if (resume == null) {
+                _status.value = if (errored) LinkStatus.Failed else LinkStatus.Closed
+                return
+            }
+            attempt++
+            if (attempt > MAX_RETRIES) {
+                _status.value = LinkStatus.Failed
+                return
+            }
+            reconnecting = true
+        }
+    }
+
+    companion object {
+        private const val MAX_RETRIES = 8
+
+        private fun backoffMillis(attempt: Int): Long {
+            // 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s — capped.
+            val exp = 1000L shl (attempt - 1).coerceIn(0, 5)
+            return exp.coerceAtMost(30_000L)
         }
     }
 }

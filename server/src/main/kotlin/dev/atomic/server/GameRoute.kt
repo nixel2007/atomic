@@ -33,9 +33,10 @@ fun Routing.gameWebSocket(rooms: RoomManager) {
             val room = session.currentRoom
             val seat = session.currentSeat
             if (room != null && seat >= 0) {
-                val empty = room.leave(seat)
+                // Socket drop: hold the seat open for a grace window so the
+                // same nickname can rejoin without losing their place.
+                room.disconnect(seat) { rooms.evict(room) }
                 session.detach()
-                if (empty) rooms.evict(room)
             }
         }
     }

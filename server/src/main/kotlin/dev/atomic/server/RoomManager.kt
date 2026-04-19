@@ -9,10 +9,18 @@ import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
 import dev.atomic.shared.net.ErrorCode
 import dev.atomic.shared.net.ServerMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
 
 class RoomManager {
     private val rooms = ConcurrentHashMap<String, Room>()
@@ -34,8 +42,21 @@ class RoomManager {
         return room
     }
 
+    /**
+     * Tries to rejoin an existing seat (same nickname as one currently in its
+     * disconnect grace window). If no such seat exists, admits the session as
+     * a new player. Returns true iff the session is now attached to the room.
+     */
     suspend fun join(code: String, session: Session, nickname: String): Boolean {
         val room = rooms[code] ?: return false
+        val rejoinSeat = room.tryRejoin(session, nickname)
+        if (rejoinSeat != null) {
+            val resumeState = room.currentState()
+            session.send(ServerMessage.RoomJoined(room.code, rejoinSeat, room.players, room.maxSeats, room.readySeats()))
+            if (resumeState != null) session.send(ServerMessage.GameStarted(resumeState))
+            room.announceRejoined(rejoinSeat)
+            return true
+        }
         val seat = room.admit(session, nickname) ?: return false
         session.send(ServerMessage.RoomJoined(room.code, seat, room.players, room.maxSeats, room.readySeats()))
         room.announceJoined(seat)
@@ -43,7 +64,7 @@ class RoomManager {
     }
 
     fun evict(room: Room) {
-        rooms.remove(room.code, room)
+        if (rooms.remove(room.code, room)) room.close()
     }
 
     private fun newCode(): String {
@@ -63,12 +84,20 @@ class Room(
     private val mutex = Mutex()
     private val occupants = mutableMapOf<Int, Occupant>()
     private var state: GameState? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    data class Occupant(val session: Session, val player: Player, var ready: Boolean = false)
+    data class Occupant(
+        var session: Session?,
+        val player: Player,
+        var ready: Boolean = false,
+        var graceJob: Job? = null
+    )
 
     val players: List<Player> get() = occupants.values.sortedBy { it.player.index }.map { it.player }
 
     fun readySeats(): List<Int> = occupants.values.filter { it.ready }.map { it.player.index }.sorted()
+
+    suspend fun currentState(): GameState? = mutex.withLock { state }
 
     /**
      * Reserves a seat for [session]. Returns the seat index, or null if the
@@ -89,9 +118,28 @@ class Room(
         seat
     }
 
+    /**
+     * If an occupant with [nickname] is currently in its disconnect grace
+     * window (session is null, graceJob is active), swap in the new session,
+     * cancel the timer and return the seat. Otherwise null.
+     */
+    suspend fun tryRejoin(session: Session, nickname: String): Int? = mutex.withLock {
+        val target = occupants.values.firstOrNull { it.session == null && it.player.name == nickname }
+            ?: return@withLock null
+        target.graceJob?.cancel()
+        target.graceJob = null
+        target.session = session
+        session.attach(this, target.player.index)
+        target.player.index
+    }
+
     suspend fun announceJoined(seat: Int) {
         val player = mutex.withLock { occupants[seat]?.player } ?: return
         broadcastExcept(seat, ServerMessage.PlayerJoined(player))
+    }
+
+    suspend fun announceRejoined(seat: Int) {
+        broadcastExcept(seat, ServerMessage.PlayerRejoined(seat))
     }
 
     suspend fun markReady(seat: Int) {
@@ -135,10 +183,37 @@ class Room(
         }
     }
 
-    /** @return true if the room is now empty and should be evicted. */
+    /**
+     * Socket-close path. Keeps the seat reserved for [graceSeconds] so the
+     * same nickname can resume via [tryRejoin]. If the grace window elapses
+     * without a reconnect, evicts the seat and calls [onEmpty] if the room
+     * is now empty so the route can remove the Room from the manager.
+     */
+    suspend fun disconnect(seat: Int, graceSeconds: Int = GRACE_SECONDS, onEmpty: suspend () -> Unit) {
+        val announce = mutex.withLock {
+            val occ = occupants[seat] ?: return
+            occ.session = null
+            occ.graceJob?.cancel()
+            occ.graceJob = scope.launch {
+                delay(graceSeconds.seconds)
+                val empty = evictSeat(seat)
+                if (empty) onEmpty()
+            }
+            true
+        }
+        if (announce) broadcast(ServerMessage.PlayerDisconnected(seat, graceSeconds))
+    }
+
+    /** Explicit LeaveRoom: evict the seat immediately. */
     suspend fun leave(seat: Int): Boolean {
+        val empty = evictSeat(seat)
+        return empty
+    }
+
+    private suspend fun evictSeat(seat: Int): Boolean {
         val nowEmpty = mutex.withLock {
-            occupants.remove(seat)
+            val occ = occupants.remove(seat) ?: return@withLock occupants.isEmpty()
+            occ.graceJob?.cancel()
             occupants.isEmpty()
         }
         broadcast(ServerMessage.PlayerLeft(seat))
@@ -149,19 +224,25 @@ class Room(
         broadcast(ServerMessage.Chat(fromSeat, text.take(280)))
     }
 
+    fun close() {
+        scope.cancel()
+    }
+
     private suspend fun send(seat: Int, message: ServerMessage) {
         occupants[seat]?.session?.send(message)
     }
 
     private suspend fun broadcast(message: ServerMessage) {
-        occupants.values.forEach { it.session.send(message) }
+        occupants.values.forEach { it.session?.send(message) }
     }
 
     private suspend fun broadcastExcept(seat: Int, message: ServerMessage) {
-        occupants.forEach { (s, occ) -> if (s != seat) occ.session.send(message) }
+        occupants.forEach { (s, occ) -> if (s != seat) occ.session?.send(message) }
     }
 
     companion object {
+        private const val GRACE_SECONDS = 30
+
         private val PALETTE = longArrayOf(
             0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L
         )
