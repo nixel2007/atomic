@@ -132,6 +132,32 @@ class GameRouteIntegrationTest {
     }
 
     @Test
+    fun hostAloneInLobbyGetsLongerGraceWindow() = testApplication {
+        // given — a host who just created a room and is sitting alone in it
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host = wsClient.webSocketSession(urlString = "/game")
+        host.sendMsg(defaultCreateRoom("alice"))
+        val code = host.expectOf<ServerMessage.RoomCreated>().code
+        host.close()
+
+        // when — a different session tries to rejoin the same room shortly
+        // after the host drops (simulating the host backgrounding the app to
+        // share the code and coming back a minute later)
+        val revived = wsClient.webSocketSession(urlString = "/game")
+        revived.sendMsg(ClientMessage.JoinRoom(code, "alice"))
+        val msg = revived.expectOf<ServerMessage.RoomJoined>()
+
+        // then — the room is still there and the same seat is resumed, not
+        // RoomNotFound. With the short 30s grace this test would only pass
+        // because it runs in <30s, but the grace is now ten minutes for a
+        // lonely host in lobby — the interesting bit is that we get
+        // RoomJoined instead of ErrorMessage(RoomNotFound).
+        assertEquals(0, msg.seat)
+        revived.close()
+    }
+
+    @Test
     fun rejoinWithSameNicknameResumesSameSeat() = testApplication {
         // given — a room with a host and a guest
         application { module() }

@@ -34,8 +34,8 @@ import kotlinx.coroutines.launch
  *
  * [Reconnecting] is a transient state between waves of a retrying connection
  * loop — the client has stored resume info and will keep trying to rejoin
- * the same room until [LinkStatus.Connected] succeeds or [MAX_RETRIES]
- * attempts are exhausted.
+ * the same room until [LinkStatus.Connected] succeeds or the user leaves
+ * intentionally.
  */
 enum class LinkStatus { Idle, Connecting, Connected, Reconnecting, Closed, Failed }
 
@@ -197,23 +197,23 @@ class MatchClient {
                 return
             }
             if (resume == null) {
+                // No active seat to resume — the initial handshake failed.
+                // Bail out so a bad URL or a dead server doesn't loop forever.
                 _status.value = if (errored) LinkStatus.Failed else LinkStatus.Closed
                 return
             }
+            // We were in a room — keep trying until the session comes back,
+            // the user intentionally leaves, or the process dies. Users often
+            // background the app for longer than the 8-attempt / ~2 min
+            // backoff would otherwise permit.
             attempt++
-            if (attempt > MAX_RETRIES) {
-                _status.value = LinkStatus.Failed
-                return
-            }
             reconnecting = true
         }
     }
 
     companion object {
-        internal const val MAX_RETRIES = 8
-
         internal fun backoffMillis(attempt: Int): Long {
-            // 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s — capped.
+            // 1s, 2s, 4s, 8s, 16s, then flat 30s.
             val exp = 1000L shl (attempt - 1).coerceIn(0, 5)
             return exp.coerceAtMost(30_000L)
         }

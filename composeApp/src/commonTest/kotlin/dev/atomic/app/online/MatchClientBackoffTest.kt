@@ -21,7 +21,7 @@ class MatchClientBackoffTest {
             4 to 8_000L,
             5 to 16_000L,
             6 to 30_000L,
-            MatchClient.MAX_RETRIES to 30_000L
+            50 to 30_000L
         )
 
         // when / then — every attempt maps to its expected rung
