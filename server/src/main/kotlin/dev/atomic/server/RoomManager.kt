@@ -190,10 +190,10 @@ class Room(
         touch()
     }
 
-    suspend fun unmarkReady(seat: Int) {
+    suspend fun setNotReady(seat: Int) {
         mutex.withLock {
             val occ = occupants[seat] ?: return
-            // Silently ignore if already unready or game has started — same
+            // Silently ignore if already not-ready or game has started — same
             // pattern as markReady, which also returns early on invalid state.
             if (!occ.ready) return
             if (state != null) return

@@ -293,12 +293,12 @@ class GameRouteIntegrationTest {
         host.expectOf<ServerMessage.PlayerReady>()
         guest.expectOf<ServerMessage.PlayerReady>()
         host.sendMsg(ClientMessage.CancelReady)
-        val hostUnready = host.expectOf<ServerMessage.PlayerNotReady>()
-        val guestUnready = guest.expectOf<ServerMessage.PlayerNotReady>()
+        val hostNotReady = host.expectOf<ServerMessage.PlayerNotReady>()
+        val guestNotReady = guest.expectOf<ServerMessage.PlayerNotReady>()
 
-        // then — both clients are notified of the unready state
-        assertEquals(0, hostUnready.seat)
-        assertEquals(0, guestUnready.seat)
+        // then — both clients are notified of the not-ready state
+        assertEquals(0, hostNotReady.seat)
+        assertEquals(0, guestNotReady.seat)
 
         // when — both players ready up properly
         host.sendMsg(ClientMessage.SetReady)

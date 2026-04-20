@@ -266,7 +266,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         stage = s.copy(ready = true)
                         client.send(ClientMessage.SetReady)
                     },
-                    onUnready = {
+                    onNotReady = {
                         stage = s.copy(ready = false)
                         client.send(ClientMessage.CancelReady)
                     },
@@ -427,7 +427,7 @@ private fun LobbyPanel(
     maxSeats: Int,
     ready: Boolean,
     onReady: () -> Unit,
-    onUnready: () -> Unit,
+    onNotReady: () -> Unit,
     onLeave: () -> Unit
 ) {
     Text("Room code", color = Color.Gray)
@@ -468,7 +468,7 @@ private fun LobbyPanel(
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (ready) {
-            OutlinedButton(onClick = onUnready) { Text("Cancel ready") }
+            OutlinedButton(onClick = onNotReady) { Text("Cancel ready") }
         } else {
             Button(onClick = onReady) { Text("I'm ready") }
         }
