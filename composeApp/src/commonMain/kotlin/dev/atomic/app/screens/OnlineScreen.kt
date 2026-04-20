@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
+import dev.atomic.app.game.ExplodingAtom
+import dev.atomic.app.game.computeExplodingAtoms
 import dev.atomic.app.online.LinkStatus
 import dev.atomic.app.online.MatchClientHolder
 import dev.atomic.app.settings.AppSettingsHolder
@@ -91,6 +93,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
     var animating by remember { mutableStateOf(false) }
     var pendingUpdate by remember { mutableStateOf<ServerMessage.GameUpdated?>(null) }
     var previousState by remember { mutableStateOf<GameState?>(null) }
+    var lastMove by remember { mutableStateOf<Pos?>(null) }
+    var explodingAtoms by remember { mutableStateOf<List<ExplodingAtom>>(emptyList()) }
 
     val status by client.status.collectAsState()
     val linkError by client.lastError.collectAsState()
@@ -105,6 +109,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         previousState = null
         displayBoard = null
         pendingUpdate = null
+        lastMove = null
+        explodingAtoms = emptyList()
     }
 
     fun playerName(s: Int): String = players.firstOrNull { it.index == s }?.name ?: "seat $s"
@@ -180,8 +186,13 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         val result = GameEngine.applyMoveTraced(prev, upd.lastMove)
         for ((i, wave) in result.waves.withIndex()) {
             displayBoard = wave
-            if (i < result.waves.size - 1) delay(FRAME_DELAY_MS)
+            if (i < result.waves.size - 1) {
+                explodingAtoms = computeExplodingAtoms(wave, prev.level, prev.players)
+                delay(FRAME_DELAY_MS)
+            }
         }
+        explodingAtoms = emptyList()
+        lastMove = if (result.waves.size == 1) upd.lastMove else null
         displayBoard = upd.state.board
         previousState = upd.state
         stage = Stage.Playing(upd.state)
@@ -275,6 +286,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     displayBoard = displayBoard ?: s.state.board,
                     seat = seat,
                     animating = animating,
+                    lastMove = lastMove,
+                    explodingAtoms = explodingAtoms,
                     onTap = { pos ->
                         if (animating || s.state.isOver) return@PlayingPanel
                         if (s.state.currentPlayerIndex != seat) return@PlayingPanel
@@ -455,6 +468,8 @@ private fun PlayingPanel(
     displayBoard: Board,
     seat: Int,
     animating: Boolean,
+    lastMove: Pos?,
+    explodingAtoms: List<ExplodingAtom>,
     onTap: (Pos) -> Unit,
     onLeave: () -> Unit
 ) {
@@ -487,7 +502,13 @@ private fun PlayingPanel(
         )
     }
 
-    BoardView(state = render, onCellTap = onTap, modifier = Modifier.fillMaxWidth())
+    BoardView(
+        state = render,
+        onCellTap = onTap,
+        lastMove = lastMove,
+        explodingAtoms = explodingAtoms,
+        modifier = Modifier.fillMaxWidth()
+    )
 
     Spacer(Modifier.height(8.dp))
     OutlinedButton(onClick = onLeave) { Text("Leave room") }

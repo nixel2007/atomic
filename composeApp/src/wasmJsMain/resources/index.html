@@ -37,18 +37,21 @@
   <div id="splash">loading…</div>
   <script type="application/javascript" src="composeApp.js"></script>
   <script type="application/javascript">
-    // Hide the splash once Compose has swapped in its canvas — the
-    // wasm bundle appends a <canvas> under #composeAppRoot when ready.
+    const SPLASH_TIMEOUT_MS = 10000;
+    // Hide the splash once Compose has rendered anything under #composeAppRoot.
+    function removeSplash() {
+      const s = document.getElementById('splash');
+      if (s) s.remove();
+      observer.disconnect();
+    }
     const observer = new MutationObserver(() => {
-      if (document.querySelector('#composeAppRoot canvas')) {
-        const s = document.getElementById('splash');
-        if (s) s.remove();
-        observer.disconnect();
-      }
+      if (document.querySelector('#composeAppRoot *')) removeSplash();
     });
     observer.observe(document.getElementById('composeAppRoot'), {
       childList: true, subtree: true,
     });
+    // Fallback: remove after SPLASH_TIMEOUT_MS in case the mutation never fires.
+    setTimeout(removeSplash, SPLASH_TIMEOUT_MS);
   </script>
 </body>
 </html>

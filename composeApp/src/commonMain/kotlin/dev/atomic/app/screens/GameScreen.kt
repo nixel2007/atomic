@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -34,6 +36,8 @@ import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
+import dev.atomic.app.game.ExplodingAtom
+import dev.atomic.app.game.computeExplodingAtoms
 import dev.atomic.shared.ai.Bot
 import dev.atomic.shared.engine.GameEngine
 import dev.atomic.shared.engine.GameSettings
@@ -48,6 +52,7 @@ private val PALETTE = longArrayOf(
     0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L
 )
 
+private const val MAX_GAME_SCREEN_WIDTH_DP = 640
 private const val FRAME_DELAY_MS = 140L
 
 @Composable
@@ -66,6 +71,8 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
     var displayBoard by remember(config) { mutableStateOf(state.board) }
     var animating by remember(config) { mutableStateOf(false) }
     var pendingMove by remember(config) { mutableStateOf<Pos?>(null) }
+    var lastMove by remember(config) { mutableStateOf<Pos?>(null) }
+    var explodingAtoms by remember(config) { mutableStateOf<List<ExplodingAtom>>(emptyList()) }
 
     // Keep the rendered board in sync when the game is reset.
     LaunchedEffect(state) {
@@ -83,8 +90,13 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
         val result = GameEngine.applyMoveTraced(state, move)
         for ((i, wave) in result.waves.withIndex()) {
             displayBoard = wave
-            if (i < result.waves.size - 1) delay(FRAME_DELAY_MS)
+            if (i < result.waves.size - 1) {
+                explodingAtoms = computeExplodingAtoms(wave, state.level, state.players)
+                delay(FRAME_DELAY_MS)
+            }
         }
+        explodingAtoms = emptyList()
+        lastMove = if (result.waves.size == 1) move else null
         state = result.finalState
         displayBoard = result.finalState.board
         animating = false
@@ -104,22 +116,29 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
 
     val renderState = remember(state, displayBoard) { state.copy(board = displayBoard) }
 
-    Column(modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
-        TurnBar(state)
-        Spacer(Modifier.height(8.dp))
-        BoardView(
-            state = renderState,
-            onCellTap = { pos ->
-                if (animating || state.isOver) return@BoardView
-                if (state.currentPlayer.kind != PlayerKind.Human) return@BoardView
-                if (!GameEngine.isLegalMove(state, pos)) return@BoardView
-                pendingMove = pos
-            },
-            modifier = Modifier.fillMaxWidth().weight(1f)
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { nav.back() }) { Text("Back") }
+    Box(
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Column(modifier = Modifier.widthIn(max = MAX_GAME_SCREEN_WIDTH_DP.dp).fillMaxHeight()) {
+            TurnBar(state)
+            Spacer(Modifier.height(8.dp))
+            BoardView(
+                state = renderState,
+                onCellTap = { pos ->
+                    if (animating || state.isOver) return@BoardView
+                    if (state.currentPlayer.kind != PlayerKind.Human) return@BoardView
+                    if (!GameEngine.isLegalMove(state, pos)) return@BoardView
+                    pendingMove = pos
+                },
+                lastMove = lastMove,
+                explodingAtoms = explodingAtoms,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { nav.back() }) { Text("Back") }
+            }
         }
     }
 
