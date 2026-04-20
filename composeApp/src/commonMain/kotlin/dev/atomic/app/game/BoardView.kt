@@ -14,12 +14,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -44,19 +46,33 @@ fun BoardView(
 ) {
     val level = state.level
     val aspect = level.width.toFloat() / level.height.toFloat()
-    Column(
-        modifier = modifier.fillMaxWidth().aspectRatio(aspect).padding(4.dp)
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
     ) {
-        for (y in 0 until level.height) {
-            Row(Modifier.fillMaxWidth().weight(1f)) {
-                for (x in 0 until level.width) {
-                    val p = Pos(x, y)
-                    Cell(
-                        state = state,
-                        pos = p,
-                        onTap = { onCellTap(p) },
-                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(2.dp)
-                    )
+        // Fit the board into the parent's bounded dimension(s) while preserving aspect ratio.
+        // If height is bounded (e.g. the game screen), honour it; otherwise fall back to width.
+        val boardWidth = if (constraints.hasBoundedHeight) {
+            val maxByWidth = maxWidth
+            val maxByHeight = maxHeight * aspect
+            if (maxByWidth <= maxByHeight) maxByWidth else maxByHeight
+        } else {
+            maxWidth
+        }
+        Column(
+            modifier = Modifier.width(boardWidth).aspectRatio(aspect).padding(4.dp)
+        ) {
+            for (y in 0 until level.height) {
+                Row(Modifier.fillMaxWidth().weight(1f)) {
+                    for (x in 0 until level.width) {
+                        val p = Pos(x, y)
+                        Cell(
+                            state = state,
+                            pos = p,
+                            onTap = { onCellTap(p) },
+                            modifier = Modifier.weight(1f).aspectRatio(1f).padding(2.dp)
+                        )
+                    }
                 }
             }
         }

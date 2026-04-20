@@ -115,7 +115,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
                 if (!GameEngine.isLegalMove(state, pos)) return@BoardView
                 pendingMove = pos
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().weight(1f)
         )
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
