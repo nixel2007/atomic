@@ -24,7 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,9 +34,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.game.ExplodingAtom
@@ -55,6 +66,8 @@ import dev.atomic.shared.net.ServerMessage
 import kotlinx.coroutines.delay
 
 private const val FRAME_DELAY_MS = 140L
+private const val SCROLL_BOTTOM_THRESHOLD_PX = 10
+private const val CHAT_VISIBLE_THRESHOLD_PX = 60
 
 private sealed interface Stage {
     data object Idle : Stage
@@ -87,6 +100,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
     var banner by remember { mutableStateOf<String?>(null) }
     var chatLines by remember { mutableStateOf<List<ChatLine>>(emptyList()) }
     var chatDraft by remember { mutableStateOf("") }
+    var chatSeenCount by remember { mutableIntStateOf(0) }
+    val unreadChat by remember { derivedStateOf { (chatLines.size - chatSeenCount).coerceAtLeast(0) } }
 
     // Animation state for cascades driven by server GameUpdated events.
     var displayBoard by remember { mutableStateOf<Board?>(null) }
@@ -106,6 +121,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         readySeats = emptySet()
         chatLines = emptyList()
         chatDraft = ""
+        chatSeenCount = 0
         previousState = null
         displayBoard = null
         pendingUpdate = null
@@ -280,14 +296,17 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     lines = chatLines,
                     draft = chatDraft,
                     selfSeat = seat,
+                    unreadCount = unreadChat,
                     onDraftChange = { chatDraft = it },
                     onSend = {
                         val text = chatDraft.trim()
                         if (text.isNotEmpty()) {
                             client.send(ClientMessage.Chat(text))
                             chatDraft = ""
+                            chatSeenCount = chatLines.size
                         }
-                    }
+                    },
+                    onRead = { chatSeenCount = chatLines.size }
                 )
             }
 
@@ -299,6 +318,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     animating = animating,
                     lastMove = lastMove,
                     explodingAtoms = explodingAtoms,
+                    unreadChat = unreadChat,
                     onTap = { pos ->
                         if (animating || s.state.isOver) return@PlayingPanel
                         if (s.state.currentPlayerIndex != seat) return@PlayingPanel
@@ -315,14 +335,17 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     lines = chatLines,
                     draft = chatDraft,
                     selfSeat = seat,
+                    unreadCount = unreadChat,
                     onDraftChange = { chatDraft = it },
                     onSend = {
                         val text = chatDraft.trim()
                         if (text.isNotEmpty()) {
                             client.send(ClientMessage.Chat(text))
                             chatDraft = ""
+                            chatSeenCount = chatLines.size
                         }
-                    }
+                    },
+                    onRead = { chatSeenCount = chatLines.size }
                 )
             }
 
@@ -484,6 +507,7 @@ private fun PlayingPanel(
     animating: Boolean,
     lastMove: Pos?,
     explodingAtoms: List<ExplodingAtom>,
+    unreadChat: Int,
     onTap: (Pos) -> Unit,
     onLeave: () -> Unit
 ) {
@@ -509,11 +533,28 @@ private fun PlayingPanel(
                 Text("you: ${it.name}")
             }
         }
-        Text(
-            if (yourTurn) "your turn" else "turn: ${turn.name}",
-            color = if (yourTurn) Color(0xFF66BB6A) else Color.Gray,
-            fontWeight = if (yourTurn) FontWeight.Bold else FontWeight.Normal
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (unreadChat > 0) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFDD835))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        "💬 $unreadChat",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Text(
+                if (yourTurn) "your turn" else "turn: ${turn.name}",
+                color = if (yourTurn) Color(0xFF66BB6A) else Color.Gray,
+                fontWeight = if (yourTurn) FontWeight.Bold else FontWeight.Normal
+            )
+        }
     }
 
     BoardView(
@@ -551,50 +592,119 @@ private fun ChatPanel(
     lines: List<ChatLine>,
     draft: String,
     selfSeat: Int,
+    unreadCount: Int,
     onDraftChange: (String) -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onRead: () -> Unit
 ) {
-    Spacer(Modifier.height(4.dp))
-    Text("Chat", fontWeight = FontWeight.Bold)
+    val scrollState = rememberScrollState()
+    val windowInfo = LocalWindowInfo.current
+
+    val isAtBottom by remember {
+        derivedStateOf {
+            scrollState.value >= scrollState.maxValue - SCROLL_BOTTOM_THRESHOLD_PX || scrollState.maxValue == 0
+        }
+    }
+
+    // Track whether this panel is visible in the outer viewport.
+    var panelYInWindow by remember { mutableIntStateOf(0) }
+    var panelHeight by remember { mutableIntStateOf(0) }
+    val isPanelVisible by remember {
+        derivedStateOf {
+            val windowHeight = windowInfo.containerSize.height
+            val visibleTop = panelYInWindow.coerceAtLeast(0)
+            val visibleBottom = (panelYInWindow + panelHeight).coerceAtMost(windowHeight)
+            visibleBottom - visibleTop >= CHAT_VISIBLE_THRESHOLD_PX
+        }
+    }
+
+    // Auto-scroll to the latest message when at the bottom.
+    // Use Int.MAX_VALUE so Compose clamps to the real maxValue after the new content is laid out.
+    LaunchedEffect(lines.size) {
+        if (isAtBottom) scrollState.animateScrollTo(Int.MAX_VALUE)
+    }
+
+    // Notify parent when all messages are in view (panel visible + inner scroll at bottom).
+    LaunchedEffect(isAtBottom, isPanelVisible) {
+        if (isAtBottom && isPanelVisible) onRead()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1A1D21))
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .onGloballyPositioned { coords ->
+                panelYInWindow = coords.positionInWindow().y.toInt()
+                panelHeight = coords.size.height
+            }
     ) {
-        if (lines.isEmpty()) {
-            Text("No messages yet.", color = Color.Gray, fontSize = 12.sp)
-        } else {
-            lines.forEach { line ->
-                Row {
-                    Text(
-                        text = line.name + (if (line.seat == selfSeat) " (you)" else "") + ": ",
-                        color = Color(line.color.toInt()),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                    Text(line.text, color = Color.White, fontSize = 13.sp)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Chat", fontWeight = FontWeight.Bold)
+            if (unreadCount > 0 && (!isAtBottom || !isPanelVisible)) {
+                Text(
+                    "↓ $unreadCount new",
+                    color = Color(0xFFFDD835),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF1A1D21))
+                .verticalScroll(scrollState)
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            if (lines.isEmpty()) {
+                Text("No messages yet.", color = Color.Gray, fontSize = 12.sp)
+            } else {
+                lines.forEach { line ->
+                    Row {
+                        Text(
+                            text = line.name + (if (line.seat == selfSeat) " (you)" else "") + ": ",
+                            color = Color(line.color.toInt()),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(line.text, color = Color.White, fontSize = 13.sp)
+                    }
                 }
             }
         }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { onDraftChange(it.take(280)) },
-            placeholder = { Text("Say something…") },
-            singleLine = true,
-            modifier = Modifier.weight(1f)
-        )
-        Button(onClick = onSend, enabled = draft.isNotBlank()) { Text("Send") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { onDraftChange(it.take(280)) },
+                placeholder = { Text("Say something…") },
+                maxLines = 4,
+                modifier = Modifier
+                    .weight(1f)
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            event.key == Key.Enter &&
+                            !event.isShiftPressed
+                        ) {
+                            onSend()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+            )
+            Button(onClick = onSend, enabled = draft.isNotBlank()) { Text("Send") }
+        }
     }
 }
 
