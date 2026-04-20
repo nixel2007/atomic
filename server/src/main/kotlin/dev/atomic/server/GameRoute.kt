@@ -32,11 +32,16 @@ fun Routing.gameWebSocket(rooms: RoomManager) {
         } finally {
             val room = session.currentRoom
             val seat = session.currentSeat
-            if (room != null && seat >= 0) {
-                // Socket drop: hold the seat open for a grace window so the
-                // same nickname can rejoin without losing their place.
-                room.disconnect(seat) { rooms.evict(room) }
-                session.detach()
+            when {
+                room != null && session.isSpectator -> {
+                    room.removeSpectator(session)
+                }
+                room != null && seat >= 0 -> {
+                    // Socket drop: hold the seat open for a grace window so the
+                    // same nickname can rejoin without losing their place.
+                    room.disconnect(seat) { rooms.evict(room) }
+                    session.detach()
+                }
             }
         }
     }
@@ -49,7 +54,7 @@ private suspend fun handle(session: Session, message: ClientMessage, rooms: Room
                 session.send(ServerMessage.ErrorMessage(ErrorCode.BadRequest, "too many rooms created, slow down"))
                 return
             }
-            rooms.create(message.level, message.settings, message.seats, session, message.nickname)
+            rooms.create(message.level, message.settings, message.seats, session, message.nickname, message.isPrivate)
         }
 
         is ClientMessage.JoinRoom -> {
@@ -57,6 +62,17 @@ private suspend fun handle(session: Session, message: ClientMessage, rooms: Room
             if (!ok) {
                 session.send(ServerMessage.ErrorMessage(ErrorCode.RoomNotFound, "room ${message.code} not found or full"))
             }
+        }
+
+        is ClientMessage.WatchRoom -> {
+            val ok = rooms.watch(message.code, session)
+            if (!ok) {
+                session.send(ServerMessage.ErrorMessage(ErrorCode.RoomNotFound, "room ${message.code} not found"))
+            }
+        }
+
+        ClientMessage.ListRooms -> {
+            session.send(ServerMessage.RoomList(rooms.listPublicRooms()))
         }
 
         ClientMessage.SetReady -> session.currentRoom?.markReady(session.currentSeat)
@@ -67,9 +83,13 @@ private suspend fun handle(session: Session, message: ClientMessage, rooms: Room
 
         ClientMessage.LeaveRoom -> {
             val room = session.currentRoom ?: return
-            val empty = room.leave(session.currentSeat)
-            session.detach()
-            if (empty) rooms.evict(room)
+            if (session.isSpectator) {
+                room.removeSpectator(session)
+            } else {
+                val empty = room.leave(session.currentSeat)
+                session.detach()
+                if (empty) rooms.evict(room)
+            }
         }
 
         is ClientMessage.Chat -> {
