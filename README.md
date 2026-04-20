@@ -1,8 +1,9 @@
 # Atomic
 
 Kotlin Multiplatform clone of the classic **Chain Reaction** game (known on
-Nokia phones as *Atomic*). Runs on Android, iOS and Desktop from a single
-Compose Multiplatform UI; online play goes through a tiny Ktor relay server.
+Nokia phones as *Atomic*). Runs on Android, iOS, Desktop and the browser
+(Compose/wasmJs) from a single Compose Multiplatform UI; online play goes
+through a tiny Ktor relay server that also serves the web client.
 
 ## Features
 
@@ -96,10 +97,33 @@ If you only want the framework (e.g. for a non-Xcode toolchain):
 ./gradlew :composeApp:linkDebugFrameworkIosArm64
 ```
 
+### Web (wasmJs)
+
+Run the browser-hosted version locally:
+
+```sh
+./gradlew :composeApp:wasmJsBrowserDevelopmentRun
+# serves http://localhost:8080 via webpack-dev-server
+```
+
+Produce a static bundle for hosting:
+
+```sh
+./gradlew :composeApp:wasmJsBrowserDistribution
+# => composeApp/build/dist/wasmJs/productionExecutable/
+#      index.html, composeApp.js, composeApp.wasm, skiko.{js,wasm}, …
+```
+
+The relay server's Dockerfile builds this bundle in a dedicated stage and
+copies it into `/app/web`; Ktor serves it via `staticFiles("/")` when
+`WEB_DIR` (default `/app/web`) exists. On Railway the single service then
+handles both the `wss://` relay and the static web client — same origin,
+no CORS setup.
+
 ### Tests
 
 ```sh
-./gradlew :shared:jvmTest :server:test
+./gradlew :shared:jvmTest :server:test :composeApp:desktopTest
 ```
 
 ## Online play

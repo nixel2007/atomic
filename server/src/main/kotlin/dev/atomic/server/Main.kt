@@ -3,6 +3,7 @@ package dev.atomic.server
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -16,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import java.io.File
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -46,5 +48,16 @@ fun Application.module() {
             call.respondText("atomic_rooms ${rooms.roomCount}\n")
         }
         gameWebSocket(rooms)
+
+        // Serves the prebuilt wasmJs bundle (composeApp.js + composeApp.wasm +
+        // index.html + skiko assets) alongside the relay, so the web client
+        // and the WebSocket share origin and no CORS setup is needed.
+        val webDir = System.getenv("WEB_DIR")?.let(::File) ?: File("/app/web")
+        if (webDir.isDirectory) {
+            log.info("serving static web assets from $webDir")
+            staticFiles("/", webDir) { default("index.html") }
+        } else {
+            log.info("no web bundle at $webDir — skipping static route")
+        }
     }
 }
