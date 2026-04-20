@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   test:
-    name: Unit tests (JVM + Android)
+    name: Compile + unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -34,8 +34,14 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-36'
 
-      - name: Run tests
-        run: ./gradlew :shared:jvmTest :server:test --stacktrace
+      - name: Compile all modules + run unit tests
+        run: >-
+          ./gradlew
+          :shared:jvmTest
+          :server:test
+          :composeApp:desktopTest
+          :androidApp:assembleDebug
+          --stacktrace
 
       - name: Upload test reports
         if: always()

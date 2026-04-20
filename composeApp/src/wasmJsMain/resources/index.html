@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0e1116" />
+  <title>Atomic</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0e1116;
+      color: #e6e6e6;
+      font-family: system-ui, sans-serif;
+    }
+    #composeAppRoot {
+      width: 100vw;
+      height: 100dvh;
+    }
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      opacity: 0.7;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="composeAppRoot"></div>
+  <div id="splash">loading…</div>
+  <script type="application/javascript" src="composeApp.js"></script>
+  <script type="application/javascript">
+    // Hide the splash once Compose has swapped in its canvas — the
+    // wasm bundle appends a <canvas> under #composeAppRoot when ready.
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('#composeAppRoot canvas')) {
+        const s = document.getElementById('splash');
+        if (s) s.remove();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.getElementById('composeAppRoot'), {
+      childList: true, subtree: true,
+    });
+  </script>
+</body>
+</html>
