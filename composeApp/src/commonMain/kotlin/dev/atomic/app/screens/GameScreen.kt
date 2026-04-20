@@ -59,9 +59,14 @@ private const val FRAME_DELAY_MS = 140L
 
 @Composable
 fun GameScreen(nav: Navigator, config: GameConfig) {
-    val humanNameFmt = stringResource(Res.string.player_human_name)
-    val botNameFmt = stringResource(Res.string.player_bot_name)
-    val players = remember(config) { buildPlayers(config, humanNameFmt, botNameFmt) }
+    // Compute localized player names in composable scope so `stringResource` is available.
+    // `remember(config)` (not keyed on locale) prevents mid-game reset on locale change.
+    val playerNames = List(config.playerCount) { i ->
+        val isBot = config.mode == GameMode.VsBot && i != config.humanSeat
+        if (isBot) stringResource(Res.string.player_bot_name, i + 1)
+        else stringResource(Res.string.player_human_name, i + 1)
+    }
+    val players = remember(config) { buildPlayers(config, playerNames) }
     var state by remember(config) {
         mutableStateOf(
             GameState.initial(
@@ -171,7 +176,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             },
             confirmButton = {
                 Button(onClick = {
-                    state = GameState.initial(state.level, state.settings, buildPlayers(config, humanNameFmt, botNameFmt))
+                    state = GameState.initial(state.level, state.settings, buildPlayers(config, playerNames))
                 }) { Text(stringResource(Res.string.btn_play_again)) }
             },
             dismissButton = {
@@ -213,12 +218,11 @@ private fun TurnBar(state: GameState) {
     }
 }
 
-private fun buildPlayers(config: GameConfig, humanNameFmt: String, botNameFmt: String): List<Player> = List(config.playerCount) { i ->
+private fun buildPlayers(config: GameConfig, playerNames: List<String>): List<Player> = List(config.playerCount) { i ->
     val isBot = config.mode == GameMode.VsBot && i != config.humanSeat
-    val nameFmt = if (isBot) botNameFmt else humanNameFmt
     Player(
         index = i,
-        name = nameFmt.replace("%1\$d", "${i + 1}"),
+        name = playerNames[i],
         color = PALETTE[i],
         kind = if (isBot) PlayerKind.Bot else PlayerKind.Human,
         difficulty = if (isBot) config.botDifficulty else null
