@@ -24,7 +24,10 @@ class GameEngineTest {
 
     @Test
     fun criticalMassMatchesNeighbourCount() {
+        // given — a plain 3x3 grid
         val level = Level.rectangular("t", "t", 3, 3)
+
+        // when / then — critical mass equals the number of playable neighbours
         assertEquals(2, level.criticalMass(Pos(0, 0)))
         assertEquals(3, level.criticalMass(Pos(1, 0)))
         assertEquals(4, level.criticalMass(Pos(1, 1)))
@@ -32,30 +35,38 @@ class GameEngineTest {
 
     @Test
     fun blockedCellsReduceCriticalMassToAllowCorridorOne() {
-        // A 3x3 grid where (0,1) and (2,1) are blocked leaves (1,1) with only
-        // the top and bottom neighbours — i.e. critical mass 2. Narrowing
-        // further produces a dead end with critical mass 1.
+        // given — a 3x3 grid carved into a T-shaped corridor with blocked walls
         val corridor = Level(
             id = "c", name = "c", width = 3, height = 3,
             blocked = setOf(Pos(0, 1), Pos(2, 1), Pos(0, 0), Pos(2, 0))
         )
+
+        // when / then — a dead-end drops to critical mass 1, a bend to 2
         assertEquals(1, corridor.criticalMass(Pos(1, 0)))
         assertEquals(2, corridor.criticalMass(Pos(1, 1)))
     }
 
     @Test
     fun placingOnEnemyCellIsIllegal() {
+        // given — P0 has claimed (0,0)
         var game = newGame()
-        game = GameEngine.applyMove(game, Pos(0, 0))           // P0
-        assertFalse(GameEngine.isLegalMove(game, Pos(0, 0)))    // P1 cannot place on P0
+        game = GameEngine.applyMove(game, Pos(0, 0))
+
+        // when / then — P1 must not be allowed to play on the same cell
+        assertFalse(GameEngine.isLegalMove(game, Pos(0, 0)))
     }
 
     @Test
     fun cornerExplodesAtTwoAtoms() {
+        // given — a 3x3 game with one atom in the corner cell (critical mass 2)
         var game = newGame()
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0 -> (0,0) count=1
-        game = GameEngine.applyMove(game, Pos(2, 2))     // P1 -> far corner
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0 -> (0,0) count=2 -> explodes
+        game = GameEngine.applyMove(game, Pos(0, 0)) // P0 → (0,0) count=1
+        game = GameEngine.applyMove(game, Pos(2, 2)) // P1 → far corner, no cascade
+
+        // when — P0 places a second atom in the corner
+        game = GameEngine.applyMove(game, Pos(0, 0))
+
+        // then — the corner explodes and both neighbours receive one atom each
         assertEquals(0, game.board.countAt(Pos(0, 0)))
         assertEquals(Board.NO_OWNER, game.board.ownerAt(Pos(0, 0)))
         assertEquals(1, game.board.countAt(Pos(1, 0)))
@@ -66,58 +77,72 @@ class GameEngineTest {
 
     @Test
     fun explosionRepaintsEnemyCell() {
+        // given — P1 holds one atom adjacent to P0's about-to-explode corner
         var game = newGame()
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0
-        game = GameEngine.applyMove(game, Pos(1, 0))     // P1 at (1,0), count=1
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0 at (0,0), count=2 -> explodes
-        // explosion pushes 1 to (1,0): P1's lone atom becomes P0's, count becomes 2
+        game = GameEngine.applyMove(game, Pos(0, 0)) // P0 corner
+        game = GameEngine.applyMove(game, Pos(1, 0)) // P1 next door, count=1
+
+        // when — P0 primes and explodes the corner
+        game = GameEngine.applyMove(game, Pos(0, 0))
+
+        // then — the atom pushed into (1,0) captures P1's stack for P0
         assertEquals(0, game.board.ownerAt(Pos(1, 0)))
         assertEquals(2, game.board.countAt(Pos(1, 0)))
     }
 
     @Test
     fun playerEliminatedWhenAllAtomsCaptured() {
-        // 2x2 board: every cell is a corner with crit mass 2.
+        // given — 2x2 duel where every cell is a corner with critical mass 2
         var game = newGame(Level.rectangular("s", "s", 2, 2))
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0
-        game = GameEngine.applyMove(game, Pos(1, 1))     // P1
-        game = GameEngine.applyMove(game, Pos(0, 0))     // P0 -> count 2 at (0,0), explodes
-        // distributes to (1,0) and (0,1); P1 still has (1,1) with count 1 -> not eliminated yet
+        game = GameEngine.applyMove(game, Pos(0, 0)) // P0
+        game = GameEngine.applyMove(game, Pos(1, 1)) // P1
+
+        // when — P0 primes the corner and then both detonate in sequence
+        game = GameEngine.applyMove(game, Pos(0, 0))
+        // intermediate: P1 still owns (1,1) with count 1 → not eliminated yet
         assertNull(game.winner)
-        game = GameEngine.applyMove(game, Pos(1, 1))     // P1 -> count 2 at (1,1), explodes
-        // now P1's (1,1) is empty; cell (1,0) gets +1 from P1, (0,1) gets +1 from P1.
-        // Need to track further. Let's just assert game advances sensibly.
+        game = GameEngine.applyMove(game, Pos(1, 1))
+
+        // then — four moves have been played and the engine advances sensibly
         assertTrue(game.turnsPlayed == 4)
     }
 
     @Test
     fun waveAndRecursiveAgreeOnSimpleChain() {
+        // given — an identical opening sequence across both explosion modes
         val level = Level.rectangular("t", "t", 3, 3)
         val build = { mode: ExplosionMode ->
             var g = GameState.initial(level, GameSettings(mode), twoPlayers)
-            g = GameEngine.applyMove(g, Pos(0, 0)) // P0
-            g = GameEngine.applyMove(g, Pos(2, 2)) // P1
-            g = GameEngine.applyMove(g, Pos(0, 0)) // P0 explodes corner
+            g = GameEngine.applyMove(g, Pos(0, 0))
+            g = GameEngine.applyMove(g, Pos(2, 2))
+            g = GameEngine.applyMove(g, Pos(0, 0))
             g
         }
+
+        // when — both engines run the sequence
         val wave = build(ExplosionMode.Wave)
         val rec = build(ExplosionMode.Recursive)
+
+        // then — they converge on the same board
         assertEquals(wave.board.owners, rec.board.owners)
         assertEquals(wave.board.counts, rec.board.counts)
     }
 
     @Test
     fun openingMoveIntoCorridorCellExplodesImmediately() {
-        // 3x3 with blocked cells leaving (1,0) as a dead-end of critical mass 1.
-        // Its only playable neighbour is (1,1). Placing the very first atom
-        // there must explode on turn 1, not wait for the opponent's move.
+        // given — a 3x3 level carved so (1,0) is a dead end with critical
+        // mass 1, whose only playable neighbour is (1,1)
         val corridor = Level(
             id = "c", name = "c", width = 3, height = 3,
             blocked = setOf(Pos(0, 0), Pos(2, 0), Pos(0, 1), Pos(2, 1))
         )
+
         for (mode in ExplosionMode.entries) {
+            // when — the very first atom is placed in the corridor cell
             var game = GameState.initial(corridor, GameSettings(mode), twoPlayers)
             game = GameEngine.applyMove(game, Pos(1, 0))
+
+            // then — it explodes on turn 1 and the atom moves to (1,1)
             assertEquals(0, game.board.countAt(Pos(1, 0)),
                 "corridor cell should be empty after opening explosion ($mode)")
             assertEquals(Board.NO_OWNER, game.board.ownerAt(Pos(1, 0)))
@@ -129,15 +154,15 @@ class GameEngineTest {
 
     @Test
     fun winnerDeclaredWhenOnlyOneActivePlayerRemains() {
-        // 2x2, two-player duel. Orchestrate until one is out.
+        // given — a 2x2 duel with a forced three-move win for P0
         var game = newGame(Level.rectangular("s", "s", 2, 2))
-        // P0 at (0,0), P1 at (0,1), P0 at (0,0) -> explodes, sends +1 to (1,0) and (0,1).
-        // (0,1) was P1 with count=1; now becomes P0 with count=2 -> also critical, explodes.
-        // It distributes to (0,0) and (1,1). (1,1) was empty -> becomes P0 with count=1.
-        // Result: P0 owns everything, P1 has 0 atoms and has played -> eliminated.
         game = GameEngine.applyMove(game, Pos(0, 0))
         game = GameEngine.applyMove(game, Pos(0, 1))
+
+        // when — the decisive cascade plays out
         game = GameEngine.applyMove(game, Pos(0, 0))
+
+        // then — P0 is declared the winner
         assertNotNull(game.winner)
         assertEquals(0, game.winner)
     }

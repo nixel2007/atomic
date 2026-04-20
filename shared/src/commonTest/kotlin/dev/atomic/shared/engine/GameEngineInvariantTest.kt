@@ -34,20 +34,27 @@ class GameEngineInvariantTest {
 
     private fun totalAtoms(s: GameState): Int = s.board.counts.sum()
 
-    private fun play(state: GameState, move: Pos): GameState {
+    /**
+     * Applies [move] to [state] and asserts every post-move invariant before
+     * returning the new state. Used as the step function of the fuzzer so a
+     * failure pins down the exact transition that broke an invariant.
+     */
+    private fun playAndAssertInvariants(state: GameState, move: Pos): GameState {
+        // given
         assertTrue(GameEngine.isLegalMove(state, move), "move $move illegal")
         val before = state
+
+        // when
         val after = GameEngine.applyMove(state, move)
 
-        // Invariant 1: the board only ever grows by +1 atom per move
-        // (cascades distribute but don't create atoms).
+        // then — atoms grow by exactly one, cascades only redistribute
         assertEquals(totalAtoms(before) + 1, totalAtoms(after),
             "atom count must grow by exactly 1 per move")
 
-        // Invariant 2: turnsPlayed monotonically increases.
+        // then — turn counter monotonically increases
         assertEquals(before.turnsPlayed + 1, after.turnsPlayed)
 
-        // Invariant 3: every non-empty cell is owned by an active player.
+        // then — every non-empty cell is owned by an active player
         for (i in after.board.counts.indices) {
             if (after.board.counts[i] > 0) {
                 val owner = after.board.owners[i]
@@ -60,13 +67,13 @@ class GameEngineInvariantTest {
             }
         }
 
-        // Invariant 4: if the game is over, exactly one player is still active.
+        // then — if the game is over, exactly one active player remains
         if (after.winner != null) {
             assertEquals(1, after.players.count { it.active })
             assertEquals(after.winner, after.players.single { it.active }.index)
         }
 
-        // Invariant 5: if the game is not over, the next player to move is active.
+        // then — if the game is not over, the next mover is active
         if (!after.isOver) {
             assertTrue(after.currentPlayer.active, "next player must be active")
         }
@@ -82,7 +89,7 @@ class GameEngineInvariantTest {
             val moves = GameEngine.legalMoves(state)
             if (moves.isEmpty()) break
             val pick = moves[rng.nextInt(moves.size)]
-            state = play(state, pick)
+            state = playAndAssertInvariants(state, pick)
             guard++
         }
         return state
@@ -90,6 +97,10 @@ class GameEngineInvariantTest {
 
     @Test
     fun invariantsHoldAcrossRandomGames_wave() {
+        // given — a fresh two-player game on each level
+        // when  — 50 seeded random playouts in Wave mode
+        // then  — every step satisfies the invariants enforced by
+        //         playAndAssertInvariants
         for (seed in 0L until 50L) {
             for (level in levels) {
                 randomLegalPlayout(seed, level, ExplosionMode.Wave)
@@ -99,6 +110,9 @@ class GameEngineInvariantTest {
 
     @Test
     fun invariantsHoldAcrossRandomGames_recursive() {
+        // given — a fresh two-player game on each level
+        // when  — 50 seeded random playouts in Recursive mode
+        // then  — every step satisfies the invariants
         for (seed in 0L until 50L) {
             for (level in levels) {
                 randomLegalPlayout(seed, level, ExplosionMode.Recursive)
@@ -108,14 +122,14 @@ class GameEngineInvariantTest {
 
     @Test
     fun waveAndRecursiveAgreeAcrossRandomGames() {
-        // Pair playouts: same seed, same level, same move sequence driven by
-        // legalMoves ordering. Wave vs Recursive should converge on the same
-        // board after every move.
         for (seed in 0L until 30L) {
             for (level in levels) {
+                // given — paired states driven by the same move sequence
                 val rng = Random(seed)
                 var sWave = GameState.initial(level, GameSettings(ExplosionMode.Wave), players)
                 var sRec = GameState.initial(level, GameSettings(ExplosionMode.Recursive), players)
+
+                // when — play identical legal moves on both engines
                 var guard = 0
                 while (!sWave.isOver && !sRec.isOver && guard < 100) {
                     val moves = GameEngine.legalMoves(sWave)
@@ -123,6 +137,8 @@ class GameEngineInvariantTest {
                     val pick = moves[rng.nextInt(moves.size)]
                     sWave = GameEngine.applyMove(sWave, pick)
                     sRec = GameEngine.applyMove(sRec, pick)
+
+                    // then — Wave and Recursive converge on the same board
                     assertEquals(sWave.board.owners, sRec.board.owners,
                         "owners diverge (seed=$seed level=${level.id} turn=$guard)")
                     assertEquals(sWave.board.counts, sRec.board.counts,
@@ -136,26 +152,34 @@ class GameEngineInvariantTest {
 
     @Test
     fun applyMoveTracedFinalStateMatchesApplyMove() {
-        val state = GameState.initial(
+        // given — a primed corner so the next move triggers a cascade
+        var g = GameState.initial(
             Level.rectangular("r", "r", 3, 3),
             GameSettings(ExplosionMode.Wave),
             players
         )
-        // Build a board with a primed corner so the traced move actually cascades.
-        var g = state
         g = GameEngine.applyMove(g, Pos(0, 0))
         g = GameEngine.applyMove(g, Pos(2, 2))
+
+        // when — the same cascading move is applied plain and traced
         val plain = GameEngine.applyMove(g, Pos(0, 0))
         val traced = GameEngine.applyMoveTraced(g, Pos(0, 0))
+
+        // then — finalState matches applyMove and the trace is populated
         assertEquals(plain, traced.finalState)
         assertTrue(traced.waves.isNotEmpty(), "cascading move should emit wave snapshots")
     }
 
     @Test
     fun applyMoveIsDeterministic() {
+        // given — identical seed + level + mode on two independent playouts
         val level = Level.rectangular("r", "r", 4, 3)
+
+        // when — both playouts run to completion
         val a = randomLegalPlayout(seed = 12345L, level = level, mode = ExplosionMode.Wave)
         val b = randomLegalPlayout(seed = 12345L, level = level, mode = ExplosionMode.Wave)
+
+        // then — the resulting states match byte-for-byte
         assertEquals(a.board.owners, b.board.owners)
         assertEquals(a.board.counts, b.board.counts)
         assertEquals(a.turnsPlayed, b.turnsPlayed)
@@ -164,18 +188,24 @@ class GameEngineInvariantTest {
 
     @Test
     fun illegalMoveOnOpponentCellIsRejectedByLegalMoves() {
+        // given — P0 has claimed (0,0); it is now P1's turn
         var state = GameState.initial(
             Level.rectangular("r", "r", 3, 3),
             GameSettings(),
             players
         )
-        state = GameEngine.applyMove(state, Pos(0, 0)) // P0 claims (0,0)
+        state = GameEngine.applyMove(state, Pos(0, 0))
+
+        // when — we enumerate the legal moves for P1
         val moves = GameEngine.legalMoves(state)
+
+        // then — (0,0) is not among them
         assertTrue(Pos(0, 0) !in moves, "P1 must not be allowed to place on P0's cell")
     }
 
     @Test
     fun legalMovesEmptyAfterWin() {
+        // given — a forced win on a 2x2 board
         var state = GameState.initial(
             Level.rectangular("s", "s", 2, 2),
             GameSettings(),
@@ -183,22 +213,28 @@ class GameEngineInvariantTest {
         )
         state = GameEngine.applyMove(state, Pos(0, 0))
         state = GameEngine.applyMove(state, Pos(0, 1))
+
+        // when — the move that decides the match is played
         state = GameEngine.applyMove(state, Pos(0, 0))
+
+        // then — game is over and no further legal moves exist
         assertNotNull(state.winner)
         assertEquals(emptyList(), GameEngine.legalMoves(state))
     }
 
     @Test
     fun firstPlayerCannotLoseBeforeSecondPlayerMoves() {
-        // Until every seat has played at least one move, no-one can be
-        // eliminated — players start with 0 atoms and are only marked
-        // inactive once they've played AND been reduced back to zero.
+        // given — a pristine two-player game
         val state = GameState.initial(
             Level.rectangular("r", "r", 3, 3),
             GameSettings(),
             players
         )
+
+        // when — only P0 has made a single move
         val after = GameEngine.applyMove(state, Pos(0, 0))
+
+        // then — the match cannot be decided; elimination requires hasPlayed
         assertNull(after.winner, "game cannot be over after the opening move")
         assertTrue(after.players.all { it.active || !it.hasPlayed })
     }

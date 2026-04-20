@@ -52,111 +52,113 @@ class GameRouteIntegrationTest {
         send(Frame.Text(m.encode()))
     }
 
+    private fun defaultCreateRoom(nickname: String = "alice") = ClientMessage.CreateRoom(
+        level = Level.rectangular("r", "r", 3, 3),
+        settings = GameSettings(),
+        seats = 2,
+        nickname = nickname
+    )
+
     @Test
     fun healthAndMetricsEndpointsServeOk() = testApplication {
+        // given — the server module is running
         application { module() }
+
+        // when — the HTTP health and metrics endpoints are hit
         val health = client.get("/health")
+        val metrics = client.get("/metrics")
+
+        // then — both return 200 with the expected bodies
         assertEquals(HttpStatusCode.OK, health.status)
         assertEquals("ok", health.bodyAsText())
-        val metrics = client.get("/metrics")
         assertEquals(HttpStatusCode.OK, metrics.status)
         assertTrue(metrics.bodyAsText().startsWith("atomic_rooms "))
     }
 
     @Test
     fun twoClientsCanCreateJoinAndStartAGame() = testApplication {
+        // given — the server is running and two WebSocket clients are connected
         application { module() }
         val wsClient = createClient { install(WebSockets) }
-        wsClient.webSocketSession(urlString = "/game").run {
-            val host = this
-            sendMsg(ClientMessage.CreateRoom(
-                level = Level.rectangular("r", "r", 3, 3),
-                settings = GameSettings(),
-                seats = 2,
-                nickname = "alice"
-            ))
-            val created = host.expectOf<ServerMessage.RoomCreated>()
-            assertEquals(0, created.seat)
-            assertEquals(2, created.maxSeats)
-            val code = created.code
+        val host = wsClient.webSocketSession(urlString = "/game")
+        val guest = wsClient.webSocketSession(urlString = "/game")
 
-            wsClient.webSocketSession(urlString = "/game").run {
-                val guest = this
-                sendMsg(ClientMessage.JoinRoom(code, "bob"))
-                val joined = guest.expectOf<ServerMessage.RoomJoined>()
-                assertEquals(1, joined.seat)
+        // when — host creates a room and guest joins it
+        host.sendMsg(defaultCreateRoom("alice"))
+        val created = host.expectOf<ServerMessage.RoomCreated>()
+        val code = created.code
+        guest.sendMsg(ClientMessage.JoinRoom(code, "bob"))
+        val joined = guest.expectOf<ServerMessage.RoomJoined>()
+        val announce = host.expectOf<ServerMessage.PlayerJoined>()
 
-                // Host receives PlayerJoined announcement.
-                val announce = host.expectOf<ServerMessage.PlayerJoined>()
-                assertEquals(1, announce.player.index)
+        // then — seats are assigned in order and host is notified
+        assertEquals(0, created.seat)
+        assertEquals(2, created.maxSeats)
+        assertEquals(1, joined.seat)
+        assertEquals(1, announce.player.index)
 
-                // Both ready → GameStarted broadcast.
-                host.sendMsg(ClientMessage.SetReady)
-                host.expectOf<ServerMessage.PlayerReady>()
-                guest.expectOf<ServerMessage.PlayerReady>()
-                guest.sendMsg(ClientMessage.SetReady)
-                host.expectOf<ServerMessage.PlayerReady>()
-                guest.expectOf<ServerMessage.PlayerReady>()
-                val started = host.expectOf<ServerMessage.GameStarted>()
-                guest.expectOf<ServerMessage.GameStarted>()
-                assertEquals(0, started.state.currentPlayerIndex)
+        // when — both players ready up
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        guest.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        val started = host.expectOf<ServerMessage.GameStarted>()
+        guest.expectOf<ServerMessage.GameStarted>()
 
-                // Host makes first move, both see GameUpdated.
-                host.sendMsg(ClientMessage.MakeMove(Pos(0, 0)))
-                val update = host.expectOf<ServerMessage.GameUpdated>()
-                guest.expectOf<ServerMessage.GameUpdated>()
-                assertEquals(0, update.bySeat)
-                assertEquals(Pos(0, 0), update.lastMove)
+        // then — GameStarted is broadcast and P0 is the opener
+        assertEquals(0, started.state.currentPlayerIndex)
 
-                // Guest tries to play out of turn (it's P1's turn now — wait, P0 just played).
-                // Actually after host's move the currentPlayerIndex should be 1.
-                assertEquals(1, update.state.currentPlayerIndex)
+        // when — host makes the opening move
+        host.sendMsg(ClientMessage.MakeMove(Pos(0, 0)))
+        val update = host.expectOf<ServerMessage.GameUpdated>()
+        guest.expectOf<ServerMessage.GameUpdated>()
 
-                // Host attempting a move now should get NotYourTurn.
-                host.sendMsg(ClientMessage.MakeMove(Pos(2, 2)))
-                val err = host.expectOf<ServerMessage.ErrorMessage>()
-                assertEquals(ErrorCode.NotYourTurn, err.code)
+        // then — both clients see the move and turn rotates to P1
+        assertEquals(0, update.bySeat)
+        assertEquals(Pos(0, 0), update.lastMove)
+        assertEquals(1, update.state.currentPlayerIndex)
 
-                guest.close()
-            }
-            host.close()
-        }
+        // when — host tries to move out of turn
+        host.sendMsg(ClientMessage.MakeMove(Pos(2, 2)))
+        val err = host.expectOf<ServerMessage.ErrorMessage>()
+
+        // then — the server rejects with NotYourTurn
+        assertEquals(ErrorCode.NotYourTurn, err.code)
+
+        guest.close()
+        host.close()
     }
 
     @Test
     fun rejoinWithSameNicknameResumesSameSeat() = testApplication {
+        // given — a room with a host and a guest
         application { module() }
         val wsClient = createClient { install(WebSockets) }
         val hostSession = wsClient.webSocketSession(urlString = "/game")
-        hostSession.sendMsg(ClientMessage.CreateRoom(
-            level = Level.rectangular("r", "r", 3, 3),
-            settings = GameSettings(),
-            seats = 2,
-            nickname = "alice"
-        ))
-        val created = hostSession.expectOf<ServerMessage.RoomCreated>()
-        val code = created.code
-
+        hostSession.sendMsg(defaultCreateRoom("alice"))
+        val code = hostSession.expectOf<ServerMessage.RoomCreated>().code
         val guest1 = wsClient.webSocketSession(urlString = "/game")
         guest1.sendMsg(ClientMessage.JoinRoom(code, "bob"))
-        val joined = guest1.expectOf<ServerMessage.RoomJoined>()
-        val bobSeat = joined.seat
-        hostSession.expectOf<ServerMessage.PlayerJoined>() // announcement on host side
+        val bobSeat = guest1.expectOf<ServerMessage.RoomJoined>().seat
+        hostSession.expectOf<ServerMessage.PlayerJoined>()
 
-        // Guest drops the connection without LeaveRoom — seat is held in grace.
+        // when — the guest's socket drops without LeaveRoom
         guest1.close()
-
-        // Host sees PlayerDisconnected (not PlayerLeft).
         val dc = hostSession.expectOf<ServerMessage.PlayerDisconnected>()
+
+        // then — host is told the seat is held, not freed
         assertEquals(bobSeat, dc.seat)
 
-        // A new session claims the same nickname → tryRejoin swaps it into the
-        // held seat instead of allocating a fresh one.
+        // when — a new session rejoins with the same nickname
         val guest2 = wsClient.webSocketSession(urlString = "/game")
         guest2.sendMsg(ClientMessage.JoinRoom(code, "bob"))
         val rejoined = guest2.expectOf<ServerMessage.RoomJoined>()
-        assertEquals(bobSeat, rejoined.seat)
         val rejAnnounce = hostSession.expectOf<ServerMessage.PlayerRejoined>()
+
+        // then — tryRejoin swaps the new session into the same seat
+        assertEquals(bobSeat, rejoined.seat)
         assertEquals(bobSeat, rejAnnounce.seat)
 
         guest2.close()
@@ -165,37 +167,42 @@ class GameRouteIntegrationTest {
 
     @Test
     fun roomNotFoundErrorOnBadCode() = testApplication {
+        // given — a connected client and no rooms on the server
         application { module() }
         val wsClient = createClient { install(WebSockets) }
         val s = wsClient.webSocketSession(urlString = "/game")
+
+        // when — the client tries to join a bogus code
         s.sendMsg(ClientMessage.JoinRoom("000000", "nobody"))
         val err = s.expectOf<ServerMessage.ErrorMessage>()
+
+        // then — the server replies RoomNotFound
         assertEquals(ErrorCode.RoomNotFound, err.code)
         s.close()
     }
 
     @Test
     fun chatRateLimitKicksInAfterFiveMessages() = testApplication {
+        // given — a session sitting alone in a room
         application { module() }
         val wsClient = createClient { install(WebSockets) }
         val host = wsClient.webSocketSession(urlString = "/game")
-        host.sendMsg(ClientMessage.CreateRoom(
-            level = Level.rectangular("r", "r", 3, 3),
-            settings = GameSettings(),
-            seats = 2,
-            nickname = "alice"
-        ))
+        host.sendMsg(defaultCreateRoom("alice"))
         host.expectOf<ServerMessage.RoomCreated>()
 
-        // 5 messages inside the 10s window are allowed, the 6th must be
-        // rejected with a BadRequest ErrorMessage.
+        // when — five chats go through inside the 10s window
         repeat(5) { i ->
             host.sendMsg(ClientMessage.Chat("msg $i"))
             val chat = host.expectOf<ServerMessage.Chat>()
+            // then (intermediate) — each is echoed back verbatim
             assertEquals("msg $i", chat.text)
         }
+
+        // when — the sixth chat inside the same window is sent
         host.sendMsg(ClientMessage.Chat("rate limited"))
         val err = host.expectOf<ServerMessage.ErrorMessage>()
+
+        // then — the server rejects with BadRequest citing the rate limit
         assertEquals(ErrorCode.BadRequest, err.code)
         assertTrue("rate limit" in err.message)
         host.close()
@@ -203,42 +210,41 @@ class GameRouteIntegrationTest {
 
     @Test
     fun createRoomRateLimitAllowsThreePerWindow() = testApplication {
+        // given — a single session that will repeatedly create then leave rooms
         application { module() }
         val wsClient = createClient { install(WebSockets) }
         val s = wsClient.webSocketSession(urlString = "/game")
-        // Three CreateRoom calls succeed; the fourth gets BadRequest.
+
+        // when — three successive CreateRoom calls are made inside the window
         repeat(3) {
-            // Before the next CreateRoom, must leave the current room so the
-            // session can host another one; disconnect briefly.
-            s.sendMsg(ClientMessage.CreateRoom(
-                level = Level.rectangular("r", "r", 3, 3),
-                settings = GameSettings(),
-                seats = 2,
-                nickname = "alice"
-            ))
+            s.sendMsg(defaultCreateRoom("alice"))
             s.expectOf<ServerMessage.RoomCreated>()
             s.sendMsg(ClientMessage.LeaveRoom)
-            // PlayerLeft may be broadcast but only to others; our session has
-            // no listeners, so the queue stays empty. No expect() needed.
+            // PlayerLeft is only broadcast to other occupants; the session is
+            // alone in its room so no queue drain is needed here.
         }
-        s.sendMsg(ClientMessage.CreateRoom(
-            level = Level.rectangular("r", "r", 3, 3),
-            settings = GameSettings(),
-            seats = 2,
-            nickname = "alice"
-        ))
+
+        // when — a fourth CreateRoom call follows immediately
+        s.sendMsg(defaultCreateRoom("alice"))
         val err = s.expectOf<ServerMessage.ErrorMessage>()
+
+        // then — the limiter rejects it with BadRequest
         assertEquals(ErrorCode.BadRequest, err.code)
         s.close()
     }
 
     @Test
     fun malformedClientMessageYieldsBadRequest() = testApplication {
+        // given — a connected client
         application { module() }
         val wsClient = createClient { install(WebSockets) }
         val s = wsClient.webSocketSession(urlString = "/game")
+
+        // when — the client sends a non-JSON text frame
         s.send(Frame.Text("this is not json"))
         val err = s.expectOf<ServerMessage.ErrorMessage>()
+
+        // then — the server replies BadRequest instead of disconnecting
         assertEquals(ErrorCode.BadRequest, err.code)
         s.close()
     }

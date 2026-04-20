@@ -13,26 +13,39 @@ class MatchClientBackoffTest {
 
     @Test
     fun doublesUntilCapped() {
-        assertEquals(1_000L, MatchClient.backoffMillis(1))
-        assertEquals(2_000L, MatchClient.backoffMillis(2))
-        assertEquals(4_000L, MatchClient.backoffMillis(3))
-        assertEquals(8_000L, MatchClient.backoffMillis(4))
-        assertEquals(16_000L, MatchClient.backoffMillis(5))
-        // Subsequent retries hit the 30s ceiling.
-        assertEquals(30_000L, MatchClient.backoffMillis(6))
-        assertEquals(30_000L, MatchClient.backoffMillis(MatchClient.MAX_RETRIES))
+        // given — attempt numbers 1..5 map to 1s..16s, the rest hit the ceiling
+        val expected = mapOf(
+            1 to 1_000L,
+            2 to 2_000L,
+            3 to 4_000L,
+            4 to 8_000L,
+            5 to 16_000L,
+            6 to 30_000L,
+            MatchClient.MAX_RETRIES to 30_000L
+        )
+
+        // when / then — every attempt maps to its expected rung
+        for ((attempt, ms) in expected) {
+            assertEquals(ms, MatchClient.backoffMillis(attempt), "attempt=$attempt")
+        }
     }
 
     @Test
     fun attemptZeroAndNegativeDontCrash() {
-        // Should be clamped to the first rung, not negative-shift into oblivion.
-        assertEquals(1_000L, MatchClient.backoffMillis(0))
-        assertEquals(1_000L, MatchClient.backoffMillis(-1))
+        // given — edge-case attempt numbers that would underflow `shl`
+        val edgeCases = listOf(0, -1)
+
+        // when / then — both clamp to the first rung (1s) instead of exploding
+        for (attempt in edgeCases) {
+            assertEquals(1_000L, MatchClient.backoffMillis(attempt), "attempt=$attempt")
+        }
     }
 
     @Test
     fun backoffNeverExceedsCeiling() {
-        // Any attempt value produces something in (0, 30_000].
+        // given — a wide sweep of attempt numbers
+        // when  — we compute the backoff for each
+        // then  — every result is in (0, 30_000]
         for (a in 1..50) {
             val ms = MatchClient.backoffMillis(a)
             assertTrue(ms in 1L..30_000L, "backoff($a) = $ms out of range")
