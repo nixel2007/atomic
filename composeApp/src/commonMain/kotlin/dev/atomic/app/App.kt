@@ -1,5 +1,6 @@
 package dev.atomic.app
 
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -8,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import dev.atomic.app.screens.EditorScreen
 import dev.atomic.app.screens.GameScreen
 import dev.atomic.app.screens.HelpScreen
@@ -18,7 +20,7 @@ import dev.atomic.app.screens.SetupScreen
 @Composable
 fun App() {
     MaterialTheme(colorScheme = darkColorScheme()) {
-        Surface {
+        Surface(modifier = Modifier.safeDrawingPadding()) {
             var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
             val nav = object : Navigator {
                 override fun go(next: Screen) { screen = next }
