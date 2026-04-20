@@ -32,6 +32,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import atomic.composeapp.generated.resources.Res
+import atomic.composeapp.generated.resources.btn_back
+import atomic.composeapp.generated.resources.btn_back_to_menu
+import atomic.composeapp.generated.resources.btn_play_again
+import atomic.composeapp.generated.resources.game_final_turn_count
+import atomic.composeapp.generated.resources.game_player_out
+import atomic.composeapp.generated.resources.game_players_eliminated
+import atomic.composeapp.generated.resources.game_turn
+import atomic.composeapp.generated.resources.game_winner
+import atomic.composeapp.generated.resources.player_bot_prefix
+import atomic.composeapp.generated.resources.player_human_prefix
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
@@ -47,6 +58,7 @@ import dev.atomic.shared.engine.PlayerKind
 import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
 private val PALETTE = longArrayOf(
     0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L
@@ -57,8 +69,10 @@ private const val FRAME_DELAY_MS = 140L
 
 @Composable
 fun GameScreen(nav: Navigator, config: GameConfig) {
-    val players = remember(config) { buildPlayers(config) }
-    var state by remember(config) {
+    val botPrefix = stringResource(Res.string.player_bot_prefix)
+    val humanPrefix = stringResource(Res.string.player_human_prefix)
+    val players = remember(config, botPrefix, humanPrefix) { buildPlayers(config, botPrefix, humanPrefix) }
+    var state by remember(config, botPrefix, humanPrefix) {
         mutableStateOf(
             GameState.initial(
                 level = config.level
@@ -137,7 +151,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { nav.back() }) { Text("Back") }
+                OutlinedButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_back)) }
             }
         }
     }
@@ -155,23 +169,23 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
                             .clip(CircleShape)
                             .background(Color(w.color.toInt()))
                     )
-                    Text("${w.name} wins!", fontWeight = FontWeight.Bold)
+                    Text(stringResource(Res.string.game_winner, w.name), fontWeight = FontWeight.Bold)
                 }
             },
             text = {
                 Column {
-                    Text("Final turn count: ${state.turnsPlayed}")
+                    Text(stringResource(Res.string.game_final_turn_count, state.turnsPlayed))
                     val eliminated = state.players.count { !it.active }
-                    if (eliminated > 0) Text("Players eliminated: $eliminated")
+                    if (eliminated > 0) Text(stringResource(Res.string.game_players_eliminated, eliminated))
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    state = GameState.initial(state.level, state.settings, buildPlayers(config))
-                }) { Text("Play again") }
+                    state = GameState.initial(state.level, state.settings, buildPlayers(config, botPrefix, humanPrefix))
+                }) { Text(stringResource(Res.string.btn_play_again)) }
             },
             dismissButton = {
-                TextButton(onClick = { nav.back() }) { Text("Back to menu") }
+                TextButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_back_to_menu)) }
             }
         )
     }
@@ -179,6 +193,8 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
 
 @Composable
 private fun TurnBar(state: GameState) {
+    val outText = stringResource(Res.string.game_player_out)
+    val turnText = stringResource(Res.string.game_turn, state.turnsPlayed + 1)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,22 +212,22 @@ private fun TurnBar(state: GameState) {
                         .background(if (dim) col.copy(alpha = 0.25f) else col)
                 )
                 Text(
-                    text = "${p.name}${if (!p.active) " (out)" else ""}",
+                    text = if (!p.active) "${p.name} $outText" else p.name,
                     modifier = Modifier.padding(end = 12.dp),
                     color = if (p.index == state.currentPlayerIndex && !state.isOver) Color.White else Color.Gray,
                     fontWeight = if (p.index == state.currentPlayerIndex && !state.isOver) FontWeight.Bold else FontWeight.Normal
                 )
             }
         }
-        Text("turn ${state.turnsPlayed + 1}", color = Color.Gray)
+        Text(turnText, color = Color.Gray)
     }
 }
 
-private fun buildPlayers(config: GameConfig): List<Player> = List(config.playerCount) { i ->
+private fun buildPlayers(config: GameConfig, botPrefix: String, humanPrefix: String): List<Player> = List(config.playerCount) { i ->
     val isBot = config.mode == GameMode.VsBot && i != config.humanSeat
     Player(
         index = i,
-        name = if (isBot) "Bot ${i + 1}" else "P${i + 1}",
+        name = if (isBot) "$botPrefix ${i + 1}" else "$humanPrefix ${i + 1}",
         color = PALETTE[i],
         kind = if (isBot) PlayerKind.Bot else PlayerKind.Human,
         difficulty = if (isBot) config.botDifficulty else null

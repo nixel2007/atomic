@@ -29,6 +29,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import atomic.composeapp.generated.resources.Res
+import atomic.composeapp.generated.resources.btn_close
+import atomic.composeapp.generated.resources.help_capture_desc
+import atomic.composeapp.generated.resources.help_capture_headline
+import atomic.composeapp.generated.resources.help_critical_mass_desc
+import atomic.composeapp.generated.resources.help_critical_mass_headline
+import atomic.composeapp.generated.resources.help_placement_desc
+import atomic.composeapp.generated.resources.help_placement_headline
+import atomic.composeapp.generated.resources.help_tab_capture
+import atomic.composeapp.generated.resources.help_tab_critical_mass
+import atomic.composeapp.generated.resources.help_tab_placement
+import atomic.composeapp.generated.resources.help_tab_victory
+import atomic.composeapp.generated.resources.help_victory_desc
+import atomic.composeapp.generated.resources.help_victory_headline
+import atomic.composeapp.generated.resources.screen_help
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.shared.engine.Board
@@ -38,6 +53,8 @@ import dev.atomic.shared.engine.Player
 import dev.atomic.shared.engine.PlayerKind
 import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** A single cell to pre-populate in an illustration board. */
 private data class CellSnapshot(val pos: Pos, val ownerIndex: Int, val count: Int)
@@ -81,11 +98,11 @@ private fun illustrationState(
     )
 }
 
-private enum class HelpTab(val title: String) {
-    Placement("Placement"),
-    CriticalMass("Critical Mass"),
-    Capture("Capture"),
-    Victory("Victory"),
+private enum class HelpTab(val titleRes: StringResource) {
+    Placement(Res.string.help_tab_placement),
+    CriticalMass(Res.string.help_tab_critical_mass),
+    Capture(Res.string.help_tab_capture),
+    Victory(Res.string.help_tab_victory),
 }
 
 @Composable
@@ -98,8 +115,8 @@ fun HelpScreen(nav: Navigator) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("How to Play", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            TextButton(onClick = { nav.back() }) { Text("Close") }
+            Text(stringResource(Res.string.screen_help), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_close)) }
         }
 
         Spacer(Modifier.height(4.dp))
@@ -109,7 +126,7 @@ fun HelpScreen(nav: Navigator) {
                 Tab(
                     selected = selectedTab == tab,
                     onClick = { selectedTab = tab },
-                    text = { Text(tab.title) }
+                    text = { Text(stringResource(tab.titleRes)) }
                 )
             }
         }
@@ -142,9 +159,8 @@ private fun PlacementTab() {
         )
     }
     RuleSlide(
-        headline = "Placing an Atom",
-        description = "On your turn tap any empty cell or a cell you already own to place one atom there. " +
-                "You cannot place on a cell owned by another player.",
+        headline = stringResource(Res.string.help_placement_headline),
+        description = stringResource(Res.string.help_placement_desc),
         content = {
             BoardView(
                 state = state,
@@ -177,11 +193,8 @@ private fun CriticalMassTab() {
         )
     }
     RuleSlide(
-        headline = "Critical Mass & Explosion",
-        description = "Each cell has a critical mass equal to its number of neighbours: " +
-                "2 for corners, 3 for edges, and 4 for interior cells. " +
-                "When a cell reaches its critical mass it explodes — losing all its atoms, " +
-                "which fly outward to every neighbouring cell.",
+        headline = stringResource(Res.string.help_critical_mass_headline),
+        description = stringResource(Res.string.help_critical_mass_desc),
         content = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -232,10 +245,8 @@ private fun CaptureTab() {
         )
     }
     RuleSlide(
-        headline = "Capturing Cells",
-        description = "Atoms that fly out of an explosion always carry the owner's colour. " +
-                "If they land on a cell owned by a different player, that cell and its atoms " +
-                "are immediately converted to the attacker's colour — and a chain reaction can follow!",
+        headline = stringResource(Res.string.help_capture_headline),
+        description = stringResource(Res.string.help_capture_desc),
         content = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -280,10 +291,8 @@ private fun VictoryTab() {
         )
     }
     RuleSlide(
-        headline = "Victory",
-        description = "The last player who still has atoms on the board wins. " +
-                "A player is eliminated the moment all of their atoms are captured. " +
-                "Games support 2 to 4 players — the more players, the more chain reactions!",
+        headline = stringResource(Res.string.help_victory_headline),
+        description = stringResource(Res.string.help_victory_desc),
         content = {
             BoardView(
                 state = state,

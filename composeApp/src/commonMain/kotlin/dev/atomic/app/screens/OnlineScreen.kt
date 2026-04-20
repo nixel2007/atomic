@@ -49,6 +49,50 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import atomic.composeapp.generated.resources.Res
+import atomic.composeapp.generated.resources.btn_back
+import atomic.composeapp.generated.resources.btn_back_to_lobby
+import atomic.composeapp.generated.resources.btn_cancel_ready
+import atomic.composeapp.generated.resources.btn_im_ready
+import atomic.composeapp.generated.resources.btn_join
+import atomic.composeapp.generated.resources.btn_leave
+import atomic.composeapp.generated.resources.btn_leave_room
+import atomic.composeapp.generated.resources.btn_play_again
+import atomic.composeapp.generated.resources.btn_send
+import atomic.composeapp.generated.resources.chat_empty
+import atomic.composeapp.generated.resources.chat_new_count
+import atomic.composeapp.generated.resources.chat_placeholder
+import atomic.composeapp.generated.resources.game_winner
+import atomic.composeapp.generated.resources.label_chat
+import atomic.composeapp.generated.resources.label_create_room
+import atomic.composeapp.generated.resources.label_join_code
+import atomic.composeapp.generated.resources.label_join_room
+import atomic.composeapp.generated.resources.label_nickname
+import atomic.composeapp.generated.resources.label_room_code
+import atomic.composeapp.generated.resources.label_server_url
+import atomic.composeapp.generated.resources.online_create_room_btn
+import atomic.composeapp.generated.resources.online_custom_level
+import atomic.composeapp.generated.resources.online_player_disconnected
+import atomic.composeapp.generated.resources.online_player_left
+import atomic.composeapp.generated.resources.online_player_rejoined
+import atomic.composeapp.generated.resources.online_ready
+import atomic.composeapp.generated.resources.online_seat_fallback
+import atomic.composeapp.generated.resources.online_seats_chip
+import atomic.composeapp.generated.resources.online_seats_status
+import atomic.composeapp.generated.resources.online_share_code_hint
+import atomic.composeapp.generated.resources.online_turn
+import atomic.composeapp.generated.resources.online_waiting
+import atomic.composeapp.generated.resources.online_you
+import atomic.composeapp.generated.resources.online_you_name
+import atomic.composeapp.generated.resources.online_your_turn
+import atomic.composeapp.generated.resources.screen_online
+import atomic.composeapp.generated.resources.status_connected
+import atomic.composeapp.generated.resources.status_connecting
+import atomic.composeapp.generated.resources.status_disconnected
+import atomic.composeapp.generated.resources.status_failed
+import atomic.composeapp.generated.resources.status_failed_default
+import atomic.composeapp.generated.resources.status_not_connected
+import atomic.composeapp.generated.resources.status_reconnecting
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.game.ExplodingAtom
@@ -67,6 +111,8 @@ import dev.atomic.shared.model.Pos
 import dev.atomic.shared.net.ClientMessage
 import dev.atomic.shared.net.ServerMessage
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 private const val FRAME_DELAY_MS = 140L
 private const val SCROLL_BOTTOM_THRESHOLD_PX = 10
@@ -132,7 +178,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         explodingAtoms = emptyList()
     }
 
-    fun playerName(s: Int): String = players.firstOrNull { it.index == s }?.name ?: "seat $s"
+    suspend fun playerName(s: Int): String = players.firstOrNull { it.index == s }?.name ?: getString(Res.string.online_seat_fallback, s)
     fun playerColor(s: Int): Long = players.firstOrNull { it.index == s }?.color ?: 0xFFFFFFFFL
 
     LaunchedEffect(client) {
@@ -159,13 +205,13 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 is ServerMessage.PlayerLeft -> {
                     players = players.filter { it.index != msg.seat }
                     readySeats = readySeats - msg.seat
-                    banner = "${playerName(msg.seat)} left"
+                    banner = getString(Res.string.online_player_left, playerName(msg.seat))
                 }
                 is ServerMessage.PlayerDisconnected -> {
-                    banner = "${playerName(msg.seat)} lost connection (${msg.graceSeconds}s to rejoin)"
+                    banner = getString(Res.string.online_player_disconnected, playerName(msg.seat), msg.graceSeconds)
                 }
                 is ServerMessage.PlayerRejoined -> {
-                    banner = "${playerName(msg.seat)} reconnected"
+                    banner = getString(Res.string.online_player_rejoined, playerName(msg.seat))
                 }
                 is ServerMessage.PlayerReady -> {
                     readySeats = readySeats + msg.seat
@@ -234,7 +280,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Online", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.screen_online), fontSize = 28.sp, fontWeight = FontWeight.Bold)
 
         StatusLine(status, linkError)
         banner?.let { Text(it, color = Color(0xFFFFAB91)) }
@@ -370,12 +416,15 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
 @Composable
 private fun StatusLine(status: LinkStatus, error: String?) {
     val (label, color) = when (status) {
-        LinkStatus.Idle -> "not connected" to Color.Gray
-        LinkStatus.Connecting -> "connecting…" to Color(0xFFFDD835)
-        LinkStatus.Connected -> "connected" to Color(0xFF66BB6A)
-        LinkStatus.Reconnecting -> "reconnecting…" to Color(0xFFFDD835)
-        LinkStatus.Closed -> "disconnected" to Color.Gray
-        LinkStatus.Failed -> "failed: ${error ?: "connection error"}" to Color(0xFFE57373)
+        LinkStatus.Idle -> stringResource(Res.string.status_not_connected) to Color.Gray
+        LinkStatus.Connecting -> stringResource(Res.string.status_connecting) to Color(0xFFFDD835)
+        LinkStatus.Connected -> stringResource(Res.string.status_connected) to Color(0xFF66BB6A)
+        LinkStatus.Reconnecting -> stringResource(Res.string.status_reconnecting) to Color(0xFFFDD835)
+        LinkStatus.Closed -> stringResource(Res.string.status_disconnected) to Color.Gray
+        LinkStatus.Failed -> stringResource(
+            Res.string.status_failed,
+            error ?: stringResource(Res.string.status_failed_default)
+        ) to Color(0xFFE57373)
     }
     Text(label, color = color)
 }
@@ -394,23 +443,27 @@ private fun IdlePanel(
     OutlinedTextField(
         value = host,
         onValueChange = onHostChange,
-        label = { Text("Server URL") },
+        label = { Text(stringResource(Res.string.label_server_url)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
     OutlinedTextField(
         value = nickname,
         onValueChange = onNicknameChange,
-        label = { Text("Nickname") },
+        label = { Text(stringResource(Res.string.label_nickname)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
 
-    Text("Create room", fontWeight = FontWeight.Bold)
+    Text(stringResource(Res.string.label_create_room), fontWeight = FontWeight.Bold)
     if (customLevel != null) {
         Text(
-            "Using your custom ${customLevel.width}×${customLevel.height} level " +
-                "(${customLevel.blocked.size} blocked).",
+            stringResource(
+                Res.string.online_custom_level,
+                customLevel.width,
+                customLevel.height,
+                customLevel.blocked.size
+            ),
             color = Color(0xFF90CAF9)
         )
     }
@@ -419,20 +472,20 @@ private fun IdlePanel(
             FilterChip(
                 selected = seats == n,
                 onClick = { onSeatsChange(n) },
-                label = { Text("$n seats") }
+                label = { Text(stringResource(Res.string.online_seats_chip, n)) }
             )
         }
     }
     Button(onClick = onCreate, modifier = Modifier.fillMaxWidth()) {
-        Text("Create $seats-seat room")
+        Text(stringResource(Res.string.online_create_room_btn, seats))
     }
 
     Spacer(Modifier.height(4.dp))
-    Text("Join room", fontWeight = FontWeight.Bold)
+    Text(stringResource(Res.string.label_join_room), fontWeight = FontWeight.Bold)
     OutlinedTextField(
         value = joinCode,
         onValueChange = { onJoinCodeChange(it.filter { c -> c.isDigit() }.take(6)) },
-        label = { Text("6-digit code") },
+        label = { Text(stringResource(Res.string.label_join_code)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -440,10 +493,10 @@ private fun IdlePanel(
         onClick = onJoin,
         enabled = joinCode.length == 6,
         modifier = Modifier.fillMaxWidth()
-    ) { Text("Join") }
+    ) { Text(stringResource(Res.string.btn_join)) }
 
     Spacer(Modifier.height(4.dp))
-    OutlinedButton(onClick = onBack) { Text("Back") }
+    OutlinedButton(onClick = onBack) { Text(stringResource(Res.string.btn_back)) }
 }
 
 @Composable
@@ -458,15 +511,15 @@ private fun LobbyPanel(
     onNotReady: () -> Unit,
     onLeave: () -> Unit
 ) {
-    Text("Room code", color = Color.Gray)
+    Text(stringResource(Res.string.label_room_code), color = Color.Gray)
     Text(code, fontSize = 36.sp, fontWeight = FontWeight.Bold)
     Text(
-        "Share this code with friends. Game starts when everyone is ready.",
+        stringResource(Res.string.online_share_code_hint),
         color = Color.Gray
     )
 
     Text(
-        "Seats (${players.size}/$maxSeats) — ${readySeats.size}/$maxSeats ready",
+        stringResource(Res.string.online_seats_status, players.size, maxSeats, readySeats.size, maxSeats),
         fontWeight = FontWeight.Bold
     )
     players.forEach { p ->
@@ -481,26 +534,26 @@ private fun LobbyPanel(
             Text(
                 text = buildString {
                     append(p.name)
-                    if (p.index == seat) append(" (you)")
+                    if (p.index == seat) append(" ${stringResource(Res.string.online_you)}")
                 },
                 fontWeight = if (p.index == seat) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier.padding(end = 8.dp)
             )
             if (p.index in readySeats) {
-                Text("ready", color = Color(0xFF66BB6A), fontWeight = FontWeight.Bold)
+                Text(stringResource(Res.string.online_ready), color = Color(0xFF66BB6A), fontWeight = FontWeight.Bold)
             } else {
-                Text("waiting", color = Color.Gray)
+                Text(stringResource(Res.string.online_waiting), color = Color.Gray)
             }
         }
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (ready) {
-            OutlinedButton(onClick = onNotReady) { Text("Cancel ready") }
+            OutlinedButton(onClick = onNotReady) { Text(stringResource(Res.string.btn_cancel_ready)) }
         } else {
-            Button(onClick = onReady) { Text("I'm ready") }
+            Button(onClick = onReady) { Text(stringResource(Res.string.btn_im_ready)) }
         }
-        OutlinedButton(onClick = onLeave) { Text("Leave") }
+        OutlinedButton(onClick = onLeave) { Text(stringResource(Res.string.btn_leave)) }
     }
 }
 
@@ -535,7 +588,7 @@ private fun PlayingPanel(
                         .clip(CircleShape)
                         .background(Color(it.color.toInt()))
                 )
-                Text("you: ${it.name}")
+                Text(stringResource(Res.string.online_you_name, it.name))
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -555,7 +608,7 @@ private fun PlayingPanel(
                 }
             }
             Text(
-                if (yourTurn) "your turn" else "turn: ${turn.name}",
+                if (yourTurn) stringResource(Res.string.online_your_turn) else stringResource(Res.string.online_turn, turn.name),
                 color = if (yourTurn) Color(0xFF66BB6A) else Color.Gray,
                 fontWeight = if (yourTurn) FontWeight.Bold else FontWeight.Normal
             )
@@ -571,7 +624,7 @@ private fun PlayingPanel(
     )
 
     Spacer(Modifier.height(8.dp))
-    OutlinedButton(onClick = onLeave) { Text("Leave room") }
+    OutlinedButton(onClick = onLeave) { Text(stringResource(Res.string.btn_leave_room)) }
 }
 
 @Composable
@@ -582,14 +635,14 @@ private fun GameOverPanel(
 ) {
     val winner = state.players[winnerSeat]
     Text(
-        "${winner.name} wins!",
+        stringResource(Res.string.game_winner, winner.name),
         fontSize = 24.sp,
         fontWeight = FontWeight.Bold,
         color = Color(winner.color.toInt())
     )
     BoardView(state = state, onCellTap = {}, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(8.dp))
-    Button(onClick = onBack) { Text("Back to lobby") }
+    Button(onClick = onBack) { Text(stringResource(Res.string.btn_back_to_lobby)) }
 }
 
 @Composable
@@ -659,10 +712,10 @@ private fun ChatPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Chat", fontWeight = FontWeight.Bold)
+            Text(stringResource(Res.string.label_chat), fontWeight = FontWeight.Bold)
             if (unreadCount > 0 && (!isAtBottom || !isPanelVisible)) {
                 Text(
-                    "↓ $unreadCount new",
+                    stringResource(Res.string.chat_new_count, unreadCount),
                     color = Color(0xFFFDD835),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
@@ -680,12 +733,12 @@ private fun ChatPanel(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             if (lines.isEmpty()) {
-                Text("No messages yet.", color = Color.Gray, fontSize = 12.sp)
+                Text(stringResource(Res.string.chat_empty), color = Color.Gray, fontSize = 12.sp)
             } else {
                 lines.forEach { line ->
                     Row {
                         Text(
-                            text = line.name + (if (line.seat == selfSeat) " (you)" else "") + ": ",
+                            text = line.name + (if (line.seat == selfSeat) " ${stringResource(Res.string.online_you)}" else "") + ": ",
                             color = Color(line.color.toInt()),
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
@@ -703,7 +756,7 @@ private fun ChatPanel(
             OutlinedTextField(
                 value = draft,
                 onValueChange = { onDraftChange(it.take(280)) },
-                placeholder = { Text("Say something…") },
+                placeholder = { Text(stringResource(Res.string.chat_placeholder)) },
                 maxLines = 4,
                 // IME (soft keyboard) send action — covers Android/iOS virtual keyboards.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -723,7 +776,7 @@ private fun ChatPanel(
                         }
                     }
             )
-            Button(onClick = onSend, enabled = draft.isNotBlank()) { Text("Send") }
+            Button(onClick = onSend, enabled = draft.isNotBlank()) { Text(stringResource(Res.string.btn_send)) }
         }
     }
 }

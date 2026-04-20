@@ -21,6 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import atomic.composeapp.generated.resources.Res
+import atomic.composeapp.generated.resources.btn_back
+import atomic.composeapp.generated.resources.btn_start
+import atomic.composeapp.generated.resources.label_board_size
+import atomic.composeapp.generated.resources.label_bot_difficulty
+import atomic.composeapp.generated.resources.label_explosions
+import atomic.composeapp.generated.resources.label_players
+import atomic.composeapp.generated.resources.menu_hot_seat
+import atomic.composeapp.generated.resources.menu_vs_ai
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
@@ -29,6 +38,7 @@ import dev.atomic.app.settings.AppSettingsHolder
 import dev.atomic.app.settings.SettingKeys
 import dev.atomic.shared.engine.BotDifficulty
 import dev.atomic.shared.engine.ExplosionMode
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SetupScreen(nav: Navigator, mode: GameMode) {
@@ -54,17 +64,17 @@ fun SetupScreen(nav: Navigator, mode: GameMode) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            if (mode == GameMode.HotSeat) "Hot seat" else "Vs AI",
+            if (mode == GameMode.HotSeat) stringResource(Res.string.menu_hot_seat) else stringResource(Res.string.menu_vs_ai),
             fontSize = 28.sp, fontWeight = FontWeight.Bold
         )
-        Text("Players")
+        Text(stringResource(Res.string.label_players))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(2, 3, 4).forEach { n ->
                 FilterChip(selected = players == n, onClick = { players = n }, label = { Text("$n") })
             }
         }
 
-        Text("Board size")
+        Text(stringResource(Res.string.label_board_size))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(5 to 7, 6 to 9, 8 to 10).forEach { (w, h) ->
                 FilterChip(
@@ -75,25 +85,25 @@ fun SetupScreen(nav: Navigator, mode: GameMode) {
             }
         }
 
-        Text("Explosions")
+        Text(stringResource(Res.string.label_explosions))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ExplosionMode.entries.forEach { mode ->
                 FilterChip(
                     selected = explosion == mode,
                     onClick = { explosion = mode },
-                    label = { Text(mode.name) }
+                    label = { Text(mode.displayName()) }
                 )
             }
         }
 
         if (mode == GameMode.VsBot) {
-            Text("Bot difficulty")
+            Text(stringResource(Res.string.label_bot_difficulty))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotDifficulty.entries.forEach { d ->
                     FilterChip(
                         selected = difficulty == d,
                         onClick = { difficulty = d },
-                        label = { Text(d.name) }
+                        label = { Text(d.displayName()) }
                     )
                 }
             }
@@ -104,7 +114,7 @@ fun SetupScreen(nav: Navigator, mode: GameMode) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedButton(onClick = { nav.back() }) { Text("Back") }
+            OutlinedButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_back)) }
             Button(
                 onClick = {
                     settings.putInt(SettingKeys.LAST_PLAYERS, players)
@@ -123,7 +133,7 @@ fun SetupScreen(nav: Navigator, mode: GameMode) {
                         )
                     ))
                 }
-            ) { Text("Start") }
+            ) { Text(stringResource(Res.string.btn_start)) }
         }
     }
 }
