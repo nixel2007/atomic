@@ -151,7 +151,7 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 is ServerMessage.PlayerReady -> {
                     readySeats = readySeats + msg.seat
                 }
-                is ServerMessage.PlayerUnready -> {
+                is ServerMessage.PlayerNotReady -> {
                     readySeats = readySeats - msg.seat
                     val current = stage
                     if (msg.seat == seat && current is Stage.Lobby) {

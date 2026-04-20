@@ -199,7 +199,7 @@ class Room(
             if (state != null) return
             occ.ready = false
         }
-        broadcast(ServerMessage.PlayerUnready(seat))
+        broadcast(ServerMessage.PlayerNotReady(seat))
         touch()
     }
 

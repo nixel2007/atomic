@@ -86,7 +86,7 @@ sealed interface ServerMessage {
     data class PlayerReady(val seat: Int) : ServerMessage
 
     @Serializable
-    data class PlayerUnready(val seat: Int) : ServerMessage
+    data class PlayerNotReady(val seat: Int) : ServerMessage
 
     @Serializable
     data class GameStarted(val state: GameState) : ServerMessage
