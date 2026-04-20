@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.20"
-compose-multiplatform = "1.11.0-beta02"
+compose-multiplatform = "1.11.0-alpha04"
 ktor = "3.4.2"
 coroutines = "1.10.2"
 serialization = "1.11.0"
