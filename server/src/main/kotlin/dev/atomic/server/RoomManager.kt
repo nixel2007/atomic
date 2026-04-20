@@ -218,24 +218,36 @@ class Room(
     }
 
     /**
-     * Socket-close path. Keeps the seat reserved for [graceSeconds] so the
-     * same nickname can resume via [tryRejoin]. If the grace window elapses
-     * without a reconnect, evicts the seat and calls [onEmpty] if the room
-     * is now empty so the route can remove the Room from the manager.
+     * Socket-close path. Keeps the seat reserved for a grace window so the
+     * same nickname can resume via [tryRejoin]. If the window elapses without
+     * a reconnect, evicts the seat and calls [onEmpty] when the room is now
+     * empty so the route can remove the Room from the manager.
+     *
+     * The grace length is asymmetric:
+     *  - host alone in a not-yet-started room gets [LOBBY_ALONE_GRACE_SECONDS]
+     *    so they can minimise the app to share the room code without the
+     *    server tearing the room down behind them;
+     *  - all other cases (mid-game or multi-seat lobby) keep the shorter
+     *    [GRACE_SECONDS] so other players aren't stuck waiting.
      */
-    suspend fun disconnect(seat: Int, graceSeconds: Int = GRACE_SECONDS, onEmpty: suspend () -> Unit) {
-        val announce = mutex.withLock {
+    suspend fun disconnect(seat: Int, onEmpty: suspend () -> Unit) {
+        val graceSeconds = mutex.withLock {
             val occ = occupants[seat] ?: return
             occ.session = null
             occ.graceJob?.cancel()
+            val grace = if (state == null && occupants.size == 1) {
+                LOBBY_ALONE_GRACE_SECONDS
+            } else {
+                GRACE_SECONDS
+            }
             occ.graceJob = scope.launch {
-                delay(graceSeconds.seconds)
+                delay(grace.seconds)
                 val empty = evictSeat(seat)
                 if (empty) onEmpty()
             }
-            true
+            grace
         }
-        if (announce) broadcast(ServerMessage.PlayerDisconnected(seat, graceSeconds))
+        broadcast(ServerMessage.PlayerDisconnected(seat, graceSeconds))
     }
 
     /** Explicit LeaveRoom: evict the seat immediately. */
@@ -277,6 +289,7 @@ class Room(
 
     companion object {
         private const val GRACE_SECONDS = 30
+        private const val LOBBY_ALONE_GRACE_SECONDS = 10 * 60
 
         private val PALETTE = longArrayOf(
             0xFFE53935L, 0xFF1E88E5L, 0xFF43A047L, 0xFFFDD835L

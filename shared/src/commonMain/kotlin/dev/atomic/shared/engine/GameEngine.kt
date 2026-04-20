@@ -142,19 +142,22 @@ object GameEngine {
     ) {
         val w = level.width
         val h = level.height
-        val queue = ArrayDeque<Int>()
-        for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) queue.addLast(i)
-        while (queue.isNotEmpty()) {
-            val i = queue.removeFirst()
-            if (cm[i] == 0 || counts[i] < cm[i]) continue
-            val srcOwner = owners[i]
-            counts[i] -= cm[i]
-            if (counts[i] == 0) owners[i] = Board.NO_OWNER
-            distribute(i, srcOwner, owners, counts, level, w) { ni ->
-                if (cm[ni] > 0 && counts[ni] >= cm[ni]) queue.addLast(ni)
+        var currentWave = mutableListOf<Int>()
+        for (i in counts.indices) if (cm[i] > 0 && counts[i] >= cm[i]) currentWave.add(i)
+        while (currentWave.isNotEmpty()) {
+            val nextWave = mutableListOf<Int>()
+            for (i in currentWave) {
+                if (cm[i] == 0 || counts[i] < cm[i]) continue
+                val srcOwner = owners[i]
+                counts[i] -= cm[i]
+                if (counts[i] == 0) owners[i] = Board.NO_OWNER
+                distribute(i, srcOwner, owners, counts, level, w) { ni ->
+                    if (cm[ni] > 0 && counts[ni] >= cm[ni]) nextWave.add(ni)
+                }
+                waves?.add(snapshot(w, h, owners, counts))
             }
-            waves?.add(snapshot(w, h, owners, counts))
             if (hasSingleOwner(owners, counts)) return
+            currentWave = nextWave
         }
     }
 
