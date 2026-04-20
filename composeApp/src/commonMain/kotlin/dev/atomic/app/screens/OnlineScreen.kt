@@ -46,6 +46,9 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.game.ExplodingAtom
@@ -303,7 +306,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         if (text.isNotEmpty()) {
                             client.send(ClientMessage.Chat(text))
                             chatDraft = ""
-                            chatSeenCount = chatLines.size
+                            // +1: the server will echo our message back, pre-mark it as seen.
+                            chatSeenCount = chatLines.size + 1
                         }
                     },
                     onRead = { chatSeenCount = chatLines.size }
@@ -342,7 +346,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         if (text.isNotEmpty()) {
                             client.send(ClientMessage.Chat(text))
                             chatDraft = ""
-                            chatSeenCount = chatLines.size
+                            // +1: the server will echo our message back, pre-mark it as seen.
+                            chatSeenCount = chatLines.size + 1
                         }
                     },
                     onRead = { chatSeenCount = chatLines.size }
@@ -600,10 +605,20 @@ private fun ChatPanel(
     val scrollState = rememberScrollState()
     val windowInfo = LocalWindowInfo.current
 
+    // Separate flag that captures whether the user was at the bottom *before* new content arrives.
+    // isAtBottom from derivedStateOf can flip false when maxValue grows with new content,
+    // causing auto-scroll to miss. autoScrollEnabled is only changed by user scroll interactions.
+    var autoScrollEnabled by remember { mutableStateOf(true) }
+
     val isAtBottom by remember {
         derivedStateOf {
             scrollState.value >= scrollState.maxValue - SCROLL_BOTTOM_THRESHOLD_PX || scrollState.maxValue == 0
         }
+    }
+
+    // Sync autoScrollEnabled with user reaching / leaving the bottom.
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) autoScrollEnabled = true
     }
 
     // Track whether this panel is visible in the outer viewport.
@@ -618,10 +633,11 @@ private fun ChatPanel(
         }
     }
 
-    // Auto-scroll to the latest message when at the bottom.
+    // Auto-scroll to the latest message when the user was at the bottom before new content arrived.
     // Use Int.MAX_VALUE so Compose clamps to the real maxValue after the new content is laid out.
     LaunchedEffect(lines.size) {
-        if (isAtBottom) scrollState.animateScrollTo(Int.MAX_VALUE)
+        if (autoScrollEnabled) scrollState.animateScrollTo(Int.MAX_VALUE)
+        else autoScrollEnabled = false // user scrolled up — keep auto-scroll disabled
     }
 
     // Notify parent when all messages are in view (panel visible + inner scroll at bottom).
@@ -689,8 +705,12 @@ private fun ChatPanel(
                 onValueChange = { onDraftChange(it.take(280)) },
                 placeholder = { Text("Say something…") },
                 maxLines = 4,
+                // IME (soft keyboard) send action — covers Android/iOS virtual keyboards.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { onSend() }),
                 modifier = Modifier
                     .weight(1f)
+                    // Hardware keyboard Enter — covers desktop and physical keyboards.
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown &&
                             event.key == Key.Enter &&
