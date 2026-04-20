@@ -6,17 +6,13 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.android.library)
 }
 
 kotlin {
     jvmToolchain(21)
 
-    androidLibrary {
-        namespace = "dev.atomic.app"
-        compileSdk = 36
-        minSdk = 26
-        withHostTestBuilder { }
+    androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -72,6 +68,14 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.cio)
         }
+    }
+}
+
+android {
+    namespace = "dev.atomic.app"
+    compileSdk = 36
+    defaultConfig {
+        minSdk = 26
     }
 }
 
