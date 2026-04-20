@@ -153,7 +153,10 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 }
                 is ServerMessage.PlayerUnready -> {
                     readySeats = readySeats - msg.seat
-                    if (msg.seat == seat) stage = (stage as? Stage.Lobby)?.copy(ready = false) ?: stage
+                    val current = stage
+                    if (msg.seat == seat && current is Stage.Lobby) {
+                        stage = current.copy(ready = false)
+                    }
                 }
                 is ServerMessage.GameStarted -> {
                     players = msg.state.players

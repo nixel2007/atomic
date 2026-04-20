@@ -193,8 +193,10 @@ class Room(
     suspend fun unmarkReady(seat: Int) {
         mutex.withLock {
             val occ = occupants[seat] ?: return
+            // Silently ignore if already unready or game has started — same
+            // pattern as markReady, which also returns early on invalid state.
             if (!occ.ready) return
-            if (state != null) return  // game already started, cannot unready
+            if (state != null) return
             occ.ready = false
         }
         broadcast(ServerMessage.PlayerUnready(seat))
