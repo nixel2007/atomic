@@ -134,7 +134,7 @@ collected when everyone leaves.
 
 - **Run it locally:** `./gradlew :server:run` (listens on `localhost:8080`)
 - **Docker / cloud deploy:** see **[docs/RELAY.md](docs/RELAY.md)** for a
-  Dockerfile, `docker-compose`, and a step-by-step fly.io deploy (free tier).
+  Dockerfile, `docker-compose`, and step-by-step cloud deploy guides.
 
 Once the server is reachable, open **Online** in the app, enter the server
 URL (defaults to `wss://atomic-server-production.up.railway.app/game` — a
