@@ -187,6 +187,12 @@ The server is authoritative: it validates every move through the same
   executes `:shared:jvmTest` and `:server:test`.
 - **Build APK** (`.github/workflows/build-apk.yml`) — manual trigger,
   produces a release APK as a 1-day artifact.
+- **Publish Server Image** (`.github/workflows/publish-server-image.yml`) —
+  on `main` pushes, version tags (`v*`) or manual trigger, builds
+  `server/Dockerfile` and pushes to Docker Hub. Required repo secrets:
+  `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. Optional repo variable:
+  `DOCKERHUB_REPOSITORY` (for example `yourname/atomic-server`), otherwise
+  defaults to `${DOCKERHUB_USERNAME}/atomic-server`.
 
 ## License
 
