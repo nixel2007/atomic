@@ -110,7 +110,7 @@
     <string name="online_turn">ход: %1$s</string>
     <string name="online_you_name">вы: %1$s</string>
     <string name="online_player_left">%1$s вышел</string>
-    <string name="online_player_disconnected">%1$s потерял соединение (%2$d с на переподключение)</string>
+    <string name="online_player_disconnected">%1$s потерял соединение (%2$d сек на переподключение)</string>
     <string name="online_player_rejoined">%1$s переподключился</string>
     <string name="online_seat_fallback">место %1$d</string>
 
