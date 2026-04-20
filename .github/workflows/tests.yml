@@ -39,7 +39,7 @@ jobs:
           ./gradlew
           :shared:jvmTest
           :server:test
-          :composeApp:compileKotlinDesktop
+          :composeApp:desktopTest
           :composeApp:compileDebugKotlinAndroid
           :androidApp:assembleDebug
           --stacktrace

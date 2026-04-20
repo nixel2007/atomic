@@ -210,9 +210,9 @@ class MatchClient {
     }
 
     companion object {
-        private const val MAX_RETRIES = 8
+        internal const val MAX_RETRIES = 8
 
-        private fun backoffMillis(attempt: Int): Long {
+        internal fun backoffMillis(attempt: Int): Long {
             // 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s — capped.
             val exp = 1000L shl (attempt - 1).coerceIn(0, 5)
             return exp.coerceAtMost(30_000L)
