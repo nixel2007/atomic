@@ -88,7 +88,8 @@ fun BoardView(
     onCellTap: (Pos) -> Unit,
     modifier: Modifier = Modifier,
     lastMove: Pos? = null,
-    explodingAtoms: List<ExplodingAtom> = emptyList()
+    explodingAtoms: List<ExplodingAtom> = emptyList(),
+    interactive: Boolean = true
 ) {
     val level = state.level
     val aspect = level.width.toFloat() / level.height.toFloat()
@@ -137,6 +138,7 @@ fun BoardView(
                                 pos = p,
                                 onTap = { onCellTap(p) },
                                 isLastMove = p == lastMove,
+                                interactive = interactive,
                                 modifier = Modifier.weight(1f).aspectRatio(1f).padding(2.dp)
                             )
                         }
@@ -173,6 +175,7 @@ private fun Cell(
     pos: Pos,
     onTap: () -> Unit,
     isLastMove: Boolean,
+    interactive: Boolean,
     modifier: Modifier
 ) {
     val level = state.level
@@ -219,7 +222,7 @@ private fun Cell(
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
             .border(borderWidth, borderColor, RoundedCornerShape(6.dp))
-            .then(if (playable) Modifier.clickable(onClick = onTap) else Modifier),
+            .then(if (playable && interactive) Modifier.clickable(onClick = onTap) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         if (playable && count > 0) {
