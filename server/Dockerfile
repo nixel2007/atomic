@@ -4,6 +4,12 @@
 FROM eclipse-temurin:21-jdk AS webbuild
 WORKDIR /src
 
+# Kotlin/Wasm downloads a Node.js toolchain that is dynamically linked against
+# libatomic; install it so `kotlinWasmToolingSetup` can launch node.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libatomic1 \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY gradlew gradlew
 COPY gradle gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties ./
