@@ -1,12 +1,7 @@
 package dev.atomic.app.screens
 
 import androidx.compose.runtime.Composable
-import atomic.composeapp.generated.resources.Res
-import atomic.composeapp.generated.resources.bot_difficulty_easy
-import atomic.composeapp.generated.resources.bot_difficulty_hard
-import atomic.composeapp.generated.resources.bot_difficulty_medium
-import atomic.composeapp.generated.resources.explosion_mode_recursive
-import atomic.composeapp.generated.resources.explosion_mode_wave
+import atomic.composeapp.generated.resources.*
 import dev.atomic.shared.engine.BotDifficulty
 import dev.atomic.shared.engine.ExplosionMode
 import org.jetbrains.compose.resources.stringResource

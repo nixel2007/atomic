@@ -21,15 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import atomic.composeapp.generated.resources.Res
-import atomic.composeapp.generated.resources.btn_back
-import atomic.composeapp.generated.resources.btn_start
-import atomic.composeapp.generated.resources.label_board_size
-import atomic.composeapp.generated.resources.label_bot_difficulty
-import atomic.composeapp.generated.resources.label_explosions
-import atomic.composeapp.generated.resources.label_players
-import atomic.composeapp.generated.resources.menu_hot_seat
-import atomic.composeapp.generated.resources.menu_vs_ai
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator

@@ -65,8 +65,8 @@
     <string name="game_players_eliminated">Players eliminated: %1$d</string>
     <string name="game_turn">turn %1$d</string>
     <string name="game_player_out">(out)</string>
-    <string name="player_bot_prefix">Bot</string>
-    <string name="player_human_prefix">P</string>
+    <string name="player_bot_name">Bot %1$d</string>
+    <string name="player_human_name">P%1$d</string>
 
     <!-- Help screen tabs -->
     <string name="help_tab_placement">Placement</string>

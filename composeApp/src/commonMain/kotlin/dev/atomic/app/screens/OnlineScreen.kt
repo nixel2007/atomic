@@ -49,50 +49,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
-import atomic.composeapp.generated.resources.Res
-import atomic.composeapp.generated.resources.btn_back
-import atomic.composeapp.generated.resources.btn_back_to_lobby
-import atomic.composeapp.generated.resources.btn_cancel_ready
-import atomic.composeapp.generated.resources.btn_im_ready
-import atomic.composeapp.generated.resources.btn_join
-import atomic.composeapp.generated.resources.btn_leave
-import atomic.composeapp.generated.resources.btn_leave_room
-import atomic.composeapp.generated.resources.btn_play_again
-import atomic.composeapp.generated.resources.btn_send
-import atomic.composeapp.generated.resources.chat_empty
-import atomic.composeapp.generated.resources.chat_new_count
-import atomic.composeapp.generated.resources.chat_placeholder
-import atomic.composeapp.generated.resources.game_winner
-import atomic.composeapp.generated.resources.label_chat
-import atomic.composeapp.generated.resources.label_create_room
-import atomic.composeapp.generated.resources.label_join_code
-import atomic.composeapp.generated.resources.label_join_room
-import atomic.composeapp.generated.resources.label_nickname
-import atomic.composeapp.generated.resources.label_room_code
-import atomic.composeapp.generated.resources.label_server_url
-import atomic.composeapp.generated.resources.online_create_room_btn
-import atomic.composeapp.generated.resources.online_custom_level
-import atomic.composeapp.generated.resources.online_player_disconnected
-import atomic.composeapp.generated.resources.online_player_left
-import atomic.composeapp.generated.resources.online_player_rejoined
-import atomic.composeapp.generated.resources.online_ready
-import atomic.composeapp.generated.resources.online_seat_fallback
-import atomic.composeapp.generated.resources.online_seats_chip
-import atomic.composeapp.generated.resources.online_seats_status
-import atomic.composeapp.generated.resources.online_share_code_hint
-import atomic.composeapp.generated.resources.online_turn
-import atomic.composeapp.generated.resources.online_waiting
-import atomic.composeapp.generated.resources.online_you
-import atomic.composeapp.generated.resources.online_you_name
-import atomic.composeapp.generated.resources.online_your_turn
-import atomic.composeapp.generated.resources.screen_online
-import atomic.composeapp.generated.resources.status_connected
-import atomic.composeapp.generated.resources.status_connecting
-import atomic.composeapp.generated.resources.status_disconnected
-import atomic.composeapp.generated.resources.status_failed
-import atomic.composeapp.generated.resources.status_failed_default
-import atomic.composeapp.generated.resources.status_not_connected
-import atomic.composeapp.generated.resources.status_reconnecting
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.Navigator
 import dev.atomic.app.game.BoardView
 import dev.atomic.app.game.ExplodingAtom
@@ -203,9 +160,10 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         .sortedBy { it.index }
                 }
                 is ServerMessage.PlayerLeft -> {
+                    val leavingName = playerName(msg.seat)
                     players = players.filter { it.index != msg.seat }
                     readySeats = readySeats - msg.seat
-                    banner = getString(Res.string.online_player_left, playerName(msg.seat))
+                    banner = getString(Res.string.online_player_left, leavingName)
                 }
                 is ServerMessage.PlayerDisconnected -> {
                     banner = getString(Res.string.online_player_disconnected, playerName(msg.seat), msg.graceSeconds)

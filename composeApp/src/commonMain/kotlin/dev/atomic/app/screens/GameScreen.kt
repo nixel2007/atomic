@@ -32,17 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import atomic.composeapp.generated.resources.Res
-import atomic.composeapp.generated.resources.btn_back
-import atomic.composeapp.generated.resources.btn_back_to_menu
-import atomic.composeapp.generated.resources.btn_play_again
-import atomic.composeapp.generated.resources.game_final_turn_count
-import atomic.composeapp.generated.resources.game_player_out
-import atomic.composeapp.generated.resources.game_players_eliminated
-import atomic.composeapp.generated.resources.game_turn
-import atomic.composeapp.generated.resources.game_winner
-import atomic.composeapp.generated.resources.player_bot_prefix
-import atomic.composeapp.generated.resources.player_human_prefix
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
@@ -69,10 +59,10 @@ private const val FRAME_DELAY_MS = 140L
 
 @Composable
 fun GameScreen(nav: Navigator, config: GameConfig) {
-    val botPrefix = stringResource(Res.string.player_bot_prefix)
-    val humanPrefix = stringResource(Res.string.player_human_prefix)
-    val players = remember(config, botPrefix, humanPrefix) { buildPlayers(config, botPrefix, humanPrefix) }
-    var state by remember(config, botPrefix, humanPrefix) {
+    val humanNameFmt = stringResource(Res.string.player_human_name)
+    val botNameFmt = stringResource(Res.string.player_bot_name)
+    val players = remember(config) { buildPlayers(config, humanNameFmt, botNameFmt) }
+    var state by remember(config) {
         mutableStateOf(
             GameState.initial(
                 level = config.level
@@ -181,7 +171,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
             },
             confirmButton = {
                 Button(onClick = {
-                    state = GameState.initial(state.level, state.settings, buildPlayers(config, botPrefix, humanPrefix))
+                    state = GameState.initial(state.level, state.settings, buildPlayers(config, humanNameFmt, botNameFmt))
                 }) { Text(stringResource(Res.string.btn_play_again)) }
             },
             dismissButton = {
@@ -223,11 +213,12 @@ private fun TurnBar(state: GameState) {
     }
 }
 
-private fun buildPlayers(config: GameConfig, botPrefix: String, humanPrefix: String): List<Player> = List(config.playerCount) { i ->
+private fun buildPlayers(config: GameConfig, humanNameFmt: String, botNameFmt: String): List<Player> = List(config.playerCount) { i ->
     val isBot = config.mode == GameMode.VsBot && i != config.humanSeat
+    val nameFmt = if (isBot) botNameFmt else humanNameFmt
     Player(
         index = i,
-        name = if (isBot) "$botPrefix ${i + 1}" else "$humanPrefix ${i + 1}",
+        name = nameFmt.replace("%1\$d", "${i + 1}"),
         color = PALETTE[i],
         kind = if (isBot) PlayerKind.Bot else PlayerKind.Human,
         difficulty = if (isBot) config.botDifficulty else null

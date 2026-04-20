@@ -65,8 +65,8 @@
     <string name="game_players_eliminated">Выбыло игроков: %1$d</string>
     <string name="game_turn">ход %1$d</string>
     <string name="game_player_out">(выбыл)</string>
-    <string name="player_bot_prefix">Бот</string>
-    <string name="player_human_prefix">Игрок</string>
+    <string name="player_bot_name">Бот %1$d</string>
+    <string name="player_human_name">Игрок %1$d</string>
 
     <!-- Help screen tabs -->
     <string name="help_tab_placement">Размещение</string>

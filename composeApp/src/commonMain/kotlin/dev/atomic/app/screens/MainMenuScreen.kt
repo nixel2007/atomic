@@ -15,13 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import atomic.composeapp.generated.resources.Res
-import atomic.composeapp.generated.resources.app_subtitle
-import atomic.composeapp.generated.resources.menu_how_to_play
-import atomic.composeapp.generated.resources.menu_hot_seat
-import atomic.composeapp.generated.resources.menu_level_editor
-import atomic.composeapp.generated.resources.menu_online
-import atomic.composeapp.generated.resources.menu_vs_ai
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
 import dev.atomic.app.Screen
