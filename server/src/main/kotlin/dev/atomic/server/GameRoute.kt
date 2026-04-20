@@ -61,6 +61,8 @@ private suspend fun handle(session: Session, message: ClientMessage, rooms: Room
 
         ClientMessage.SetReady -> session.currentRoom?.markReady(session.currentSeat)
 
+        ClientMessage.CancelReady -> session.currentRoom?.unmarkReady(session.currentSeat)
+
         is ClientMessage.MakeMove -> session.currentRoom?.applyMove(session.currentSeat, message.pos)
 
         ClientMessage.LeaveRoom -> {

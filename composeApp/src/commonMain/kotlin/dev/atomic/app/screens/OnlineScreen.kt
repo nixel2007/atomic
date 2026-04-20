@@ -151,6 +151,10 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 is ServerMessage.PlayerReady -> {
                     readySeats = readySeats + msg.seat
                 }
+                is ServerMessage.PlayerUnready -> {
+                    readySeats = readySeats - msg.seat
+                    if (msg.seat == seat) stage = (stage as? Stage.Lobby)?.copy(ready = false) ?: stage
+                }
                 is ServerMessage.GameStarted -> {
                     players = msg.state.players
                     previousState = msg.state
@@ -258,6 +262,10 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     onReady = {
                         stage = s.copy(ready = true)
                         client.send(ClientMessage.SetReady)
+                    },
+                    onUnready = {
+                        stage = s.copy(ready = false)
+                        client.send(ClientMessage.CancelReady)
                     },
                     onLeave = {
                         client.send(ClientMessage.LeaveRoom)
@@ -416,6 +424,7 @@ private fun LobbyPanel(
     maxSeats: Int,
     ready: Boolean,
     onReady: () -> Unit,
+    onUnready: () -> Unit,
     onLeave: () -> Unit
 ) {
     Text("Room code", color = Color.Gray)
@@ -455,8 +464,10 @@ private fun LobbyPanel(
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onReady, enabled = !ready) {
-            Text(if (ready) "Ready ✓" else "I'm ready")
+        if (ready) {
+            OutlinedButton(onClick = onUnready) { Text("Cancel ready") }
+        } else {
+            Button(onClick = onReady) { Text("I'm ready") }
         }
         OutlinedButton(onClick = onLeave) { Text("Leave") }
     }

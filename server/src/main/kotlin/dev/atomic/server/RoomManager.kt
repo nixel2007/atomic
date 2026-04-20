@@ -190,6 +190,17 @@ class Room(
         touch()
     }
 
+    suspend fun unmarkReady(seat: Int) {
+        mutex.withLock {
+            val occ = occupants[seat] ?: return
+            if (!occ.ready) return
+            if (state != null) return  // game already started, cannot unready
+            occ.ready = false
+        }
+        broadcast(ServerMessage.PlayerUnready(seat))
+        touch()
+    }
+
     suspend fun applyMove(seat: Int, pos: Pos) {
         val (updated, isOver) = mutex.withLock {
             val current = state
