@@ -19,7 +19,8 @@ sealed interface ClientMessage {
         val level: Level,
         val settings: GameSettings,
         val seats: Int,
-        val nickname: String
+        val nickname: String,
+        val isPrivate: Boolean = false
     ) : ClientMessage
 
     @Serializable
@@ -39,6 +40,9 @@ sealed interface ClientMessage {
 
     @Serializable
     data object LeaveRoom : ClientMessage
+
+    @Serializable
+    data object ListRooms : ClientMessage
 
     @Serializable
     data class Chat(val text: String) : ClientMessage
