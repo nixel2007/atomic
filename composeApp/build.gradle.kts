@@ -12,7 +12,10 @@ plugins {
 kotlin {
     jvmToolchain(21)
 
-    androidTarget {
+    android {
+        namespace = "dev.atomic.app"
+        compileSdk = 36
+        minSdk = 26
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -69,12 +72,6 @@ kotlin {
             implementation(libs.ktor.client.cio)
         }
     }
-}
-
-android {
-    namespace = "dev.atomic.app"
-    compileSdk = 36
-    minSdk = 26
 }
 
 compose.desktop {
