@@ -10,6 +10,10 @@ COPY settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY shared shared
 COPY composeApp composeApp
 
+# settings.gradle.kts includes :server and :androidApp; Gradle requires
+# project directories to exist even when we only build :composeApp.
+RUN mkdir -p server androidApp
+
 RUN chmod +x gradlew \
  && ./gradlew --no-daemon :composeApp:wasmJsBrowserDistribution
 
