@@ -74,9 +74,7 @@ kotlin {
 android {
     namespace = "dev.atomic.app"
     compileSdk = 36
-    defaultConfig {
-        minSdk = 26
-    }
+    minSdk = 26
 }
 
 compose.desktop {
