@@ -33,6 +33,7 @@ fun MainMenuScreen(nav: Navigator) {
         MenuButton("Vs AI") { nav.go(Screen.Setup(GameMode.VsBot)) }
         MenuButton("Online") { nav.go(Screen.Online()) }
         MenuButton("Level editor") { nav.go(Screen.Editor) }
+        MenuButton("How to play") { nav.go(Screen.Help) }
     }
 }
 

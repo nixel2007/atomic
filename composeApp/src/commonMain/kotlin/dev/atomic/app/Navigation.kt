@@ -27,6 +27,7 @@ sealed interface Screen {
     /** [customLevel] pre-fills the "create room" form when launched from the editor. */
     data class Online(val customLevel: Level? = null) : Screen
     data object Editor : Screen
+    data object Help : Screen
 }
 
 interface Navigator {

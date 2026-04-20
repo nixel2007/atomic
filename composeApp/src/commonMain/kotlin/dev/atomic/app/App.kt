@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.atomic.app.screens.EditorScreen
 import dev.atomic.app.screens.GameScreen
+import dev.atomic.app.screens.HelpScreen
 import dev.atomic.app.screens.MainMenuScreen
 import dev.atomic.app.screens.OnlineScreen
 import dev.atomic.app.screens.SetupScreen
@@ -29,6 +30,7 @@ fun App() {
                 is Screen.Game -> GameScreen(nav, s.config)
                 is Screen.Online -> OnlineScreen(nav, s.customLevel)
                 Screen.Editor -> EditorScreen(nav)
+                Screen.Help -> HelpScreen(nav)
             }
         }
     }
