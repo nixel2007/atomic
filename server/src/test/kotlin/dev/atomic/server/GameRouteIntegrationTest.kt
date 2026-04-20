@@ -274,4 +274,54 @@ class GameRouteIntegrationTest {
         assertEquals(ErrorCode.BadRequest, err.code)
         s.close()
     }
+
+    @Test
+    fun playerCanCancelReadyBeforeGameStarts() = testApplication {
+        // given — two clients in the same room
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host = wsClient.webSocketSession(urlString = "/game")
+        val guest = wsClient.webSocketSession(urlString = "/game")
+        host.sendMsg(defaultCreateRoom("alice"))
+        val code = host.expectOf<ServerMessage.RoomCreated>().code
+        guest.sendMsg(ClientMessage.JoinRoom(code, "bob"))
+        guest.expectOf<ServerMessage.RoomJoined>()
+        host.expectOf<ServerMessage.PlayerJoined>()
+
+        // when — host marks ready then cancels
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        host.sendMsg(ClientMessage.CancelReady)
+        val hostNotReady = host.expectOf<ServerMessage.PlayerNotReady>()
+        val guestNotReady = guest.expectOf<ServerMessage.PlayerNotReady>()
+
+        // then — both clients are notified of the not-ready state
+        assertEquals(0, hostNotReady.seat)
+        assertEquals(0, guestNotReady.seat)
+
+        // when — both players ready up properly
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        guest.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+
+        // then — game starts after all ready
+        host.expectOf<ServerMessage.GameStarted>()
+        guest.expectOf<ServerMessage.GameStarted>()
+
+        // when — a player tries to cancel ready after game started (should be ignored)
+        host.sendMsg(ClientMessage.CancelReady)
+
+        // then — no message is sent (the server silently ignores it)
+        // We verify by sending a chat that echoes, confirming the server is still responsive
+        host.sendMsg(ClientMessage.Chat("hello"))
+        val chat = host.expectOf<ServerMessage.Chat>()
+        assertEquals("hello", chat.text)
+
+        guest.close()
+        host.close()
+    }
 }

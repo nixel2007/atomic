@@ -32,6 +32,9 @@ sealed interface ClientMessage {
     data object SetReady : ClientMessage
 
     @Serializable
+    data object CancelReady : ClientMessage
+
+    @Serializable
     data class MakeMove(val pos: Pos) : ClientMessage
 
     @Serializable
@@ -81,6 +84,9 @@ sealed interface ServerMessage {
 
     @Serializable
     data class PlayerReady(val seat: Int) : ServerMessage
+
+    @Serializable
+    data class PlayerNotReady(val seat: Int) : ServerMessage
 
     @Serializable
     data class GameStarted(val state: GameState) : ServerMessage

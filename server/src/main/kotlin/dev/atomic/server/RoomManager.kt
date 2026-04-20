@@ -190,6 +190,19 @@ class Room(
         touch()
     }
 
+    suspend fun setNotReady(seat: Int) {
+        mutex.withLock {
+            val occ = occupants[seat] ?: return
+            // Silently ignore if already not-ready or game has started — same
+            // pattern as markReady, which also returns early on invalid state.
+            if (!occ.ready) return
+            if (state != null) return
+            occ.ready = false
+        }
+        broadcast(ServerMessage.PlayerNotReady(seat))
+        touch()
+    }
+
     suspend fun applyMove(seat: Int, pos: Pos) {
         val (updated, isOver) = mutex.withLock {
             val current = state
