@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.Icon
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -132,13 +135,23 @@ fun HelpScreen(nav: Navigator) {
 
 @Composable
 private fun PlacementTab() {
-    // 3×3 board: Red has 1 atom at center (1,1); Blue has 1 atom at (2,2).
-    // The empty cell at (0,0) is highlighted using BoardView's last-move styling
-    // to draw attention to a legal placement example for Red.
-    val state = remember {
+    // Left board: 3×3, Red has 1 atom at center (1,1); Blue has 1 atom at (2,2).
+    // Right board: same state but with Red's new atom placed at top-left (0,0),
+    // highlighted via lastMove to show the result of the placement.
+    val before = remember {
         illustrationState(
             width = 3, height = 3,
             cells = listOf(
+                CellSnapshot(Pos(1, 1), ownerIndex = 0, count = 1),
+                CellSnapshot(Pos(2, 2), ownerIndex = 1, count = 1),
+            )
+        )
+    }
+    val after = remember {
+        illustrationState(
+            width = 3, height = 3,
+            cells = listOf(
+                CellSnapshot(Pos(0, 0), ownerIndex = 0, count = 1),
                 CellSnapshot(Pos(1, 1), ownerIndex = 0, count = 1),
                 CellSnapshot(Pos(2, 2), ownerIndex = 1, count = 1),
             )
@@ -148,13 +161,25 @@ private fun PlacementTab() {
         headline = stringResource(Res.string.help_placement_headline),
         description = stringResource(Res.string.help_placement_desc),
         content = {
-            BoardView(
-                state = state,
-                onCellTap = {},
-                lastMove = Pos(0, 0),
-                interactive = false,
-                modifier = Modifier.size(180.dp),
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BoardView(
+                    state = before,
+                    onCellTap = {},
+                    interactive = false,
+                    modifier = Modifier.size(120.dp),
+                )
+                BeforeAfterArrow()
+                BoardView(
+                    state = after,
+                    onCellTap = {},
+                    lastMove = Pos(0, 0),
+                    interactive = false,
+                    modifier = Modifier.size(120.dp),
+                )
+            }
         }
     )
 }
@@ -192,7 +217,7 @@ private fun CriticalMassTab() {
                     interactive = false,
                     modifier = Modifier.size(120.dp),
                 )
-                Text("→", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                BeforeAfterArrow()
                 BoardView(
                     state = after,
                     onCellTap = {},
@@ -244,7 +269,7 @@ private fun CaptureTab() {
                     interactive = false,
                     modifier = Modifier.size(120.dp),
                 )
-                Text("→", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                BeforeAfterArrow()
                 BoardView(
                     state = after,
                     onCellTap = {},
@@ -287,6 +312,16 @@ private fun VictoryTab() {
                 modifier = Modifier.size(180.dp),
             )
         }
+    )
+}
+
+@Composable
+private fun BeforeAfterArrow() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+        contentDescription = stringResource(Res.string.help_before_after_arrow),
+        tint = Color.White,
+        modifier = Modifier.size(32.dp),
     )
 }
 

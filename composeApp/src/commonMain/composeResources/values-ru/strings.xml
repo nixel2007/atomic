@@ -84,6 +84,8 @@
     <string name="help_victory_headline">Победа</string>
     <string name="help_victory_desc">Побеждает последний игрок, у которого остались атомы на доске. Игрок выбывает в тот момент, когда все его атомы захвачены. В игре участвуют от 2 до 4 игроков — чем больше игроков, тем больше цепных реакций!</string>
 
+    <string name="help_before_after_arrow">до и после</string>
+
     <!-- Level editor -->
     <string name="editor_hint">Нажмите на клетку, чтобы заблокировать или разблокировать её. Критическая масса обновляется автоматически.</string>
     <string name="editor_cm_sample">Критическая масса: центр = %1$d, угол = %2$d</string>
