@@ -1,0 +1,61 @@
+name: Build Desktop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }} desktop app
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+            task: ':composeApp:packageDmg'
+            artifact-path: 'composeApp/build/compose/binaries/main/dmg/*.dmg'
+            artifact-name: atomic-desktop-dmg
+          - os: windows-latest
+            name: Windows
+            task: ':composeApp:packageMsi'
+            artifact-path: 'composeApp/build/compose/binaries/main/msi/*.msi'
+            artifact-name: atomic-desktop-msi
+          - os: ubuntu-latest
+            name: Linux
+            task: ':composeApp:packageDeb'
+            artifact-path: 'composeApp/build/compose/binaries/main/deb/*.deb'
+            artifact-name: atomic-desktop-deb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36'
+
+      - name: Build ${{ matrix.name }} distributable
+        run: ./gradlew ${{ matrix.task }} --no-daemon --stacktrace
+
+      - name: Upload distributable
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          retention-days: 1
+          if-no-files-found: error
