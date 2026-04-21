@@ -17,6 +17,9 @@ kotlin {
         namespace = "dev.atomic.app"
         compileSdk = 36
         minSdk = 26
+        // Fix for CMP-7611/CMP-9547: enable Android resources so that compose
+        // resources are packaged into the APK assets by AGP 9.
+        androidResources.enable = true
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
