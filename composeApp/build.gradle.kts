@@ -2,25 +2,6 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// Workaround for CMP-7611 / CMP-9547:
-// CopyResourcesToAndroidAssetsTask.outputDirectory is never configured when using
-// com.android.kotlin.multiplatform.library with AGP 9, so compose resources are
-// missing from the APK assets and the app crashes with MissingResourceException.
-// https://youtrack.jetbrains.com/issue/CMP-7611
-// https://youtrack.jetbrains.com/issue/CMP-9547
-afterEvaluate {
-    val outputDir = layout.buildDirectory.dir(
-        "generated/compose/resourceGenerator/androidMain/assets"
-    )
-    tasks.named("copyAndroidMainComposeResourcesToAndroidAssets").configure {
-        @Suppress("UNCHECKED_CAST")
-        val property = this::class.java
-            .getMethod("getOutputDirectory")
-            .invoke(this) as org.gradle.api.file.DirectoryProperty
-        property.set(outputDir)
-    }
-}
-
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -36,6 +17,9 @@ kotlin {
         namespace = "dev.atomic.app"
         compileSdk = 36
         minSdk = 26
+        // Fix for CMP-7611/CMP-9547: enable Android resources so that compose
+        // resources are packaged into the APK assets by AGP 9.
+        androidResources.enable = true
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }

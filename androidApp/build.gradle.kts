@@ -59,31 +59,6 @@ android {
     }
 }
 
-// Workaround for CMP-7611 / CMP-9547: register the compose resources directory
-// produced by :composeApp as an Android asset source so they are merged into the APK.
-// https://youtrack.jetbrains.com/issue/CMP-7611
-// https://youtrack.jetbrains.com/issue/CMP-9547
-val composeResourcesAssetsDir = rootProject.file(
-    "composeApp/build/generated/compose/resourceGenerator/androidMain/assets"
-)
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.sources.assets?.addStaticSourceDirectory(composeResourcesAssetsDir.absolutePath)
-    }
-}
-
-afterEvaluate {
-    val composeResourceTasks = listOf(
-        ":composeApp:copyAndroidMainComposeResourcesToAndroidAssets",
-        ":composeApp:prepareComposeResourcesTaskForCommonMain",
-        ":composeApp:convertXmlValueResourcesForCommonMain",
-        ":composeApp:copyNonXmlValueResourcesForCommonMain",
-    )
-    tasks.matching { it.name.contains("merge") && it.name.contains("Assets") }
-        .configureEach { composeResourceTasks.forEach { path -> dependsOn(path) } }
-}
-
 dependencies {
     implementation(project(":composeApp"))
     implementation(project(":shared"))
