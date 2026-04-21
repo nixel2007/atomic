@@ -128,7 +128,7 @@
 
     <!-- Buttons -->
     <string name="btn_refresh">Обновить</string>
-    <string name="btn_watch">Смотреть</string>
+    <string name="btn_watch">Наблюдать</string>
     <string name="btn_stop_watching">Прекратить наблюдение</string>
 
     <!-- Chat -->
