@@ -2,6 +2,10 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// Unique ID injected into sw.js on every build so the Service Worker cache
+// is automatically invalidated on each deploy (rolling release).
+val buildId: String = System.currentTimeMillis().toString()
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -101,5 +105,14 @@ compose.desktop {
             packageName = "Atomic"
             packageVersion = "1.0.0"
         }
+    }
+}
+
+// Replace the %%BUILD_ID%% placeholder in sw.js with the actual build ID so
+// each CI build produces a unique Service Worker, automatically busting the
+// asset cache without any manual version bumps.
+tasks.named<Copy>("wasmJsProcessResources") {
+    filesMatching("sw.js") {
+        filter { line -> line.replace("%%BUILD_ID%%", buildId) }
     }
 }

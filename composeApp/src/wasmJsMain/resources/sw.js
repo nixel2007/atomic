@@ -1,6 +1,6 @@
 // Service Worker for Atomic
-// Bump CACHE_VERSION on every deploy to invalidate the asset cache.
-const CACHE_VERSION = 'v1';
+// CACHE_VERSION is replaced at build time with a unique build ID.
+const CACHE_VERSION = '%%BUILD_ID%%';
 const CACHE_NAME = `atomic-${CACHE_VERSION}`;
 
 // Patterns for large, immutable-per-build assets that benefit from Cache-first.
