@@ -1,6 +1,7 @@
 name: Build Desktop
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:
