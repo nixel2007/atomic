@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    uses: ./.github/workflows/build-desktop.yml
+
+  build-apk:
+    uses: ./.github/workflows/build-apk.yml
+
+  upload-assets:
+    name: Upload release assets
+    needs: [build-desktop, build-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Upload assets to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
