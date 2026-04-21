@@ -84,6 +84,8 @@
     <string name="help_victory_headline">Victory</string>
     <string name="help_victory_desc">The last player who still has atoms on the board wins. A player is eliminated the moment all of their atoms are captured. Games support 2 to 4 players — the more players, the more chain reactions!</string>
 
+    <string name="help_before_after_arrow">before and after</string>
+
     <!-- Level editor -->
     <string name="editor_hint">Tap a cell to toggle it blocked. Critical mass updates automatically.</string>
     <string name="editor_cm_sample">Critical mass sample: centre = %1$d, corner = %2$d</string>

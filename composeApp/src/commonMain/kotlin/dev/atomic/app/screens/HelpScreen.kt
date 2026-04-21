@@ -27,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -171,12 +170,7 @@ private fun PlacementTab() {
                     interactive = false,
                     modifier = Modifier.size(120.dp),
                 )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp),
-                )
+                BeforeAfterArrow()
                 BoardView(
                     state = after,
                     onCellTap = {},
@@ -222,12 +216,7 @@ private fun CriticalMassTab() {
                     interactive = false,
                     modifier = Modifier.size(120.dp),
                 )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp),
-                )
+                BeforeAfterArrow()
                 BoardView(
                     state = after,
                     onCellTap = {},
@@ -279,12 +268,7 @@ private fun CaptureTab() {
                     interactive = false,
                     modifier = Modifier.size(120.dp),
                 )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp),
-                )
+                BeforeAfterArrow()
                 BoardView(
                     state = after,
                     onCellTap = {},
@@ -327,6 +311,15 @@ private fun VictoryTab() {
                 modifier = Modifier.size(180.dp),
             )
         }
+    )
+}
+
+@Composable
+private fun BeforeAfterArrow() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+        contentDescription = stringResource(Res.string.help_before_after_arrow),
+        modifier = Modifier.size(32.dp),
     )
 }
 
