@@ -42,5 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Trigger Railway deploy
-        run: curl -X POST "${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}"
+      - name: Install Railway CLI
+        run: curl -fsSL https://railway.com/install.sh | sh
+      - name: Trigger Railway redeploy
+        run: railway redeploy --yes --service ${{ vars.RAILWAY_SERVICE_ID }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
