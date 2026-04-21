@@ -1,7 +1,7 @@
 # Atomic
 
 Kotlin Multiplatform clone of the classic **Chain Reaction** game (known on
-Nokia phones as *Atomic*). Runs on Android, iOS, Desktop and the browser
+Nokia phones as *Atomic*). Runs on Android, Desktop and the browser
 (Compose/wasmJs) from a single Compose Multiplatform UI; online play goes
 through a tiny Ktor relay server that also serves the web client.
 
@@ -39,7 +39,6 @@ so the wire protocol types are literally the same classes on both ends.
 - **JDK 21** (Temurin recommended). Android compilation targets bytecode 17
   because D8/R8 desugaring doesn't support higher yet.
 - **Android SDK 36** with `build-tools;36.0.0` for APK builds.
-- **Xcode 15+** for iOS (not required for other platforms).
 - The Gradle wrapper is checked in — no system Gradle needed.
 
 ## Building & running
