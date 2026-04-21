@@ -72,7 +72,12 @@ jobs:
 
       - name: Pack ZIP
         shell: bash
-        run: zip -r ${{ matrix.zip-file }} composeApp/build/compose/binaries/main-release/app/
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip "${{ matrix.zip-file }}" composeApp/build/compose/binaries/main-release/app/
+          else
+            zip -r "${{ matrix.zip-file }}" composeApp/build/compose/binaries/main-release/app/
+          fi
 
       - name: Upload ZIP distributable
         uses: actions/upload-artifact@v7
