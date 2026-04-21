@@ -21,16 +21,22 @@ jobs:
             task: ':composeApp:packageDmg'
             artifact-path: 'composeApp/build/compose/binaries/main/dmg/*.dmg'
             artifact-name: atomic-desktop-dmg
+            zip-file: atomic-macos.zip
+            zip-artifact-name: atomic-desktop-macos-zip
           - os: windows-latest
             name: Windows
             task: ':composeApp:packageMsi'
             artifact-path: 'composeApp/build/compose/binaries/main/msi/*.msi'
             artifact-name: atomic-desktop-msi
+            zip-file: atomic-windows.zip
+            zip-artifact-name: atomic-desktop-windows-zip
           - os: ubuntu-latest
             name: Linux
             task: ':composeApp:packageDeb'
             artifact-path: 'composeApp/build/compose/binaries/main/deb/*.deb'
             artifact-name: atomic-desktop-deb
+            zip-file: atomic-linux.zip
+            zip-artifact-name: atomic-desktop-linux-zip
 
     steps:
       - name: Checkout
@@ -61,50 +67,17 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      - name: Build Windows ZIP distributable
-        if: matrix.name == 'Windows'
+      - name: Build ZIP distributable
         run: ./gradlew :composeApp:createReleaseDistributable --no-daemon --stacktrace
 
-      - name: Pack Windows ZIP
-        if: matrix.name == 'Windows'
-        run: Compress-Archive -Path composeApp/build/compose/binaries/main-release/app/* -DestinationPath atomic-windows.zip
-        shell: pwsh
+      - name: Pack ZIP
+        shell: bash
+        run: zip -r ${{ matrix.zip-file }} composeApp/build/compose/binaries/main-release/app/
 
-      - name: Upload Windows ZIP distributable
-        if: matrix.name == 'Windows'
+      - name: Upload ZIP distributable
         uses: actions/upload-artifact@v7
         with:
-          name: atomic-desktop-zip
-          path: atomic-windows.zip
-          retention-days: 1
-          if-no-files-found: error
-
-      - name: Build Linux/macOS ZIP distributable
-        if: matrix.name == 'Linux' || matrix.name == 'macOS'
-        run: ./gradlew :composeApp:createReleaseDistributable --no-daemon --stacktrace
-
-      - name: Pack Linux ZIP
-        if: matrix.name == 'Linux'
-        run: zip -r atomic-linux.zip composeApp/build/compose/binaries/main-release/app/
-
-      - name: Upload Linux ZIP distributable
-        if: matrix.name == 'Linux'
-        uses: actions/upload-artifact@v7
-        with:
-          name: atomic-desktop-linux-zip
-          path: atomic-linux.zip
-          retention-days: 1
-          if-no-files-found: error
-
-      - name: Pack macOS ZIP
-        if: matrix.name == 'macOS'
-        run: zip -r atomic-macos.zip composeApp/build/compose/binaries/main-release/app/
-
-      - name: Upload macOS ZIP distributable
-        if: matrix.name == 'macOS'
-        uses: actions/upload-artifact@v7
-        with:
-          name: atomic-desktop-macos-zip
-          path: atomic-macos.zip
+          name: ${{ matrix.zip-artifact-name }}
+          path: ${{ matrix.zip-file }}
           retention-days: 1
           if-no-files-found: error
