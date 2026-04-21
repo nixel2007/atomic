@@ -41,7 +41,7 @@ fun Application.module() {
     intercept(ApplicationCallPipeline.Plugins) {
         val path = context.request.path()
         if (path == "/" || path == "/index.html") {
-            context.response.headers[HttpHeaders.CacheControl] = "no-cache"
+            context.response.headers.append(HttpHeaders.CacheControl, "no-cache")
         }
     }
     val rooms = RoomManager()
