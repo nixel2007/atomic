@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.GameConfig
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
@@ -36,6 +37,7 @@ import dev.atomic.shared.engine.GameState
 import dev.atomic.shared.engine.Player
 import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun EditorScreen(nav: Navigator) {
@@ -68,10 +70,10 @@ fun EditorScreen(nav: Navigator) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Level editor", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Tap a cell to toggle it blocked. Critical mass updates automatically.")
+        Text(stringResource(Res.string.screen_editor), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.editor_hint))
 
-        Text("Size")
+        Text(stringResource(Res.string.label_size))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(5 to 7, 6 to 9, 8 to 10, 10 to 14).forEach { (w, h) ->
                 FilterChip(
@@ -90,10 +92,11 @@ fun EditorScreen(nav: Navigator) {
             modifier = Modifier.fillMaxWidth()
         )
 
-        Text("Critical mass sample: centre = ${level.criticalMass(Pos(width / 2, height / 2))}, " +
-            "corner = ${level.criticalMass(Pos(0, 0))}")
+        Text(stringResource(Res.string.editor_cm_sample,
+            level.criticalMass(Pos(width / 2, height / 2)),
+            level.criticalMass(Pos(0, 0))))
 
-        Text("Players")
+        Text(stringResource(Res.string.label_players))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(2, 3, 4).forEach { n ->
                 FilterChip(
@@ -104,48 +107,48 @@ fun EditorScreen(nav: Navigator) {
             }
         }
 
-        Text("Mode")
+        Text(stringResource(Res.string.label_mode))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = mode == GameMode.HotSeat,
                 onClick = { mode = GameMode.HotSeat },
-                label = { Text("Hot seat") }
+                label = { Text(stringResource(Res.string.menu_hot_seat)) }
             )
             FilterChip(
                 selected = mode == GameMode.VsBot,
                 onClick = { mode = GameMode.VsBot },
-                label = { Text("Vs bot") }
+                label = { Text(stringResource(Res.string.mode_vs_bot)) }
             )
         }
 
         if (mode == GameMode.VsBot) {
-            Text("Bot difficulty")
+            Text(stringResource(Res.string.label_bot_difficulty))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotDifficulty.entries.forEach { d ->
                     FilterChip(
                         selected = difficulty == d,
                         onClick = { difficulty = d },
-                        label = { Text(d.name) }
+                        label = { Text(d.displayName()) }
                     )
                 }
             }
         }
 
-        Text("Explosions")
+        Text(stringResource(Res.string.label_explosions))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ExplosionMode.entries.forEach { e ->
                 FilterChip(
                     selected = explosion == e,
                     onClick = { explosion = e },
-                    label = { Text(e.name) }
+                    label = { Text(e.displayName()) }
                 )
             }
         }
 
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { nav.back() }) { Text("Back") }
-            OutlinedButton(onClick = { blocked = emptySet() }) { Text("Clear") }
+            OutlinedButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_back)) }
+            OutlinedButton(onClick = { blocked = emptySet() }) { Text(stringResource(Res.string.btn_clear)) }
             Button(
                 onClick = {
                     nav.go(
@@ -162,9 +165,9 @@ fun EditorScreen(nav: Navigator) {
                         )
                     )
                 }
-            ) { Text("Play") }
+            ) { Text(stringResource(Res.string.btn_play)) }
             Button(onClick = { nav.go(Screen.Online(customLevel = level)) }) {
-                Text("Play online")
+                Text(stringResource(Res.string.btn_play_online))
             }
         }
     }
