@@ -1,10 +1,13 @@
 package dev.atomic.server
 
+import io.ktor.http.HttpHeaders
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
+import io.ktor.server.request.path
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
@@ -32,6 +35,14 @@ fun Application.module() {
     install(WebSockets) {
         pingPeriod = 20.seconds
         timeout = 60.seconds
+    }
+    // Ensure index.html is always re-validated so new deployments are picked up.
+    // The Service Worker handles offline / fast-repeat-load caching itself.
+    intercept(ApplicationCallPipeline.Plugins) {
+        val path = context.request.path()
+        if (path == "/" || path == "/index.html") {
+            context.response.headers.append(HttpHeaders.CacheControl, "no-cache")
+        }
     }
     val rooms = RoomManager()
     val janitor = CoroutineScope(SupervisorJob() + Dispatchers.Default)

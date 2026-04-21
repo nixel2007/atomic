@@ -52,6 +52,13 @@
     });
     // Fallback: remove after SPLASH_TIMEOUT_MS in case the mutation never fires.
     setTimeout(removeSplash, SPLASH_TIMEOUT_MS);
+
+    // Register Service Worker for fast repeat loads.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Service Worker registration failed:', err);
+      });
+    }
   </script>
 </body>
 </html>
