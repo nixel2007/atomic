@@ -35,3 +35,12 @@ jobs:
         - registry: docker.io
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  deploy:
+    name: Trigger Railway deployment
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger Railway deploy
+        run: curl -X POST "${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}"
