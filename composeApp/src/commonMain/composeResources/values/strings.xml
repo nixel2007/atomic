@@ -113,6 +113,23 @@
     <string name="online_player_disconnected">%1$s lost connection (%2$ds to rejoin)</string>
     <string name="online_player_rejoined">%1$s reconnected</string>
     <string name="online_seat_fallback">seat %1$d</string>
+    <string name="online_private_room_hint">Private room (won\'t appear in lobby list)</string>
+    <string name="online_room_in_progress">In progress · %1$d/%2$d</string>
+    <string name="online_room_waiting">Waiting · %1$d/%2$d</string>
+    <string name="online_rooms_hint_refresh">Press Refresh to load the room list.</string>
+    <string name="online_rooms_empty">No public rooms at the moment.</string>
+    <string name="online_watching_room">Watching room %1$s</string>
+    <string name="online_watching_waiting">Waiting for game to start (%1$d/%2$d players)…</string>
+    <string name="online_spectating">Spectating</string>
+
+    <!-- Labels -->
+    <string name="label_join_room_by_code">Join room by code</string>
+    <string name="label_public_rooms">Public rooms</string>
+
+    <!-- Buttons -->
+    <string name="btn_refresh">Refresh</string>
+    <string name="btn_watch">Watch</string>
+    <string name="btn_stop_watching">Stop watching</string>
 
     <!-- Chat -->
     <string name="chat_new_count">↓ %1$d new</string>

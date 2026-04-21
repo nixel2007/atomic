@@ -19,7 +19,8 @@ sealed interface ClientMessage {
         val level: Level,
         val settings: GameSettings,
         val seats: Int,
-        val nickname: String
+        val nickname: String,
+        val isPrivate: Boolean = false
     ) : ClientMessage
 
     @Serializable
@@ -39,6 +40,12 @@ sealed interface ClientMessage {
 
     @Serializable
     data object LeaveRoom : ClientMessage
+
+    @Serializable
+    data object ListRooms : ClientMessage
+
+    @Serializable
+    data class WatchRoom(val code: String) : ClientMessage
 
     @Serializable
     data class Chat(val text: String) : ClientMessage
@@ -102,6 +109,17 @@ sealed interface ServerMessage {
 
     @Serializable
     data class ErrorMessage(val code: ErrorCode, val message: String) : ServerMessage
+
+    @Serializable
+    data class RoomList(val rooms: List<RoomInfo>) : ServerMessage
+
+    @Serializable
+    data class WatchStarted(
+        val code: String,
+        val players: List<Player>,
+        val maxSeats: Int,
+        val state: GameState? = null
+    ) : ServerMessage
 }
 
 @Serializable
@@ -113,3 +131,12 @@ enum class ErrorCode {
     BadRequest,
     InternalError
 }
+
+/** Summary of a room shown in the public lobby list. */
+@Serializable
+data class RoomInfo(
+    val code: String,
+    val playerCount: Int,
+    val maxSeats: Int,
+    val inProgress: Boolean
+)

@@ -113,6 +113,23 @@
     <string name="online_player_disconnected">%1$s потерял соединение (%2$d сек на переподключение)</string>
     <string name="online_player_rejoined">%1$s переподключился</string>
     <string name="online_seat_fallback">место %1$d</string>
+    <string name="online_private_room_hint">Приватная комната (не будет видна в списке)</string>
+    <string name="online_room_in_progress">Игра идёт · %1$d/%2$d</string>
+    <string name="online_room_waiting">Ожидание · %1$d/%2$d</string>
+    <string name="online_rooms_hint_refresh">Нажмите «Обновить», чтобы загрузить список комнат.</string>
+    <string name="online_rooms_empty">Публичных комнат нет.</string>
+    <string name="online_watching_room">Наблюдение: комната %1$s</string>
+    <string name="online_watching_waiting">Ожидание начала игры (%1$d/%2$d игроков)…</string>
+    <string name="online_spectating">Наблюдатель</string>
+
+    <!-- Labels -->
+    <string name="label_join_room_by_code">Войти по коду</string>
+    <string name="label_public_rooms">Публичные комнаты</string>
+
+    <!-- Buttons -->
+    <string name="btn_refresh">Обновить</string>
+    <string name="btn_watch">Наблюдать</string>
+    <string name="btn_stop_watching">Прекратить наблюдение</string>
 
     <!-- Chat -->
     <string name="chat_new_count">↓ %1$d новых</string>

@@ -66,6 +66,7 @@ import dev.atomic.shared.engine.Player
 import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
 import dev.atomic.shared.net.ClientMessage
+import dev.atomic.shared.net.RoomInfo
 import dev.atomic.shared.net.ServerMessage
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.getString
@@ -80,6 +81,8 @@ private sealed interface Stage {
     data class Lobby(val code: String, val maxSeats: Int, val ready: Boolean) : Stage
     data class Playing(val state: GameState) : Stage
     data class GameOver(val state: GameState, val winnerSeat: Int) : Stage
+    /** Spectating a room — [state] is null if the game hasn't started yet. */
+    data class Watching(val code: String, val maxSeats: Int, val state: GameState?) : Stage
 }
 
 private data class ChatLine(val seat: Int, val name: String, val color: Long, val text: String)
@@ -98,6 +101,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
     var nickname by remember { mutableStateOf(settings.getString(SettingKeys.NICKNAME, "Player")) }
     var joinCode by remember { mutableStateOf("") }
     var createSeats by remember { mutableStateOf(2) }
+    var isPrivate by remember { mutableStateOf(false) }
+    var roomList by remember { mutableStateOf<List<RoomInfo>?>(null) }
 
     var stage by remember { mutableStateOf<Stage>(Stage.Idle) }
     var seat by remember { mutableStateOf(-1) }
@@ -155,6 +160,20 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     client.setResumePoint(msg.code, nickname.ifBlank { "Player" })
                     stage = Stage.Lobby(msg.code, msg.maxSeats, ready = msg.seat in msg.readySeats)
                 }
+                is ServerMessage.WatchStarted -> {
+                    seat = -1
+                    players = msg.players
+                    readySeats = emptySet()
+                    val watchState = msg.state
+                    stage = Stage.Watching(msg.code, msg.maxSeats, watchState)
+                    if (watchState != null) {
+                        previousState = watchState
+                        displayBoard = watchState.board
+                    }
+                }
+                is ServerMessage.RoomList -> {
+                    roomList = msg.rooms
+                }
                 is ServerMessage.PlayerJoined -> {
                     players = (players.filter { it.index != msg.player.index } + msg.player)
                         .sortedBy { it.index }
@@ -185,7 +204,12 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     players = msg.state.players
                     previousState = msg.state
                     displayBoard = msg.state.board
-                    stage = Stage.Playing(msg.state)
+                    val current = stage
+                    stage = if (current is Stage.Watching) {
+                        current.copy(state = msg.state)
+                    } else {
+                        Stage.Playing(msg.state)
+                    }
                 }
                 is ServerMessage.GameUpdated -> pendingUpdate = msg
                 is ServerMessage.GameOver -> {
@@ -225,7 +249,12 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
         lastMove = if (result.waves.size == 1) upd.lastMove else null
         displayBoard = upd.state.board
         previousState = upd.state
-        stage = Stage.Playing(upd.state)
+        val current = stage
+        stage = if (current is Stage.Watching) {
+            current.copy(state = upd.state)
+        } else {
+            Stage.Playing(upd.state)
+        }
         animating = false
         pendingUpdate = null
     }
@@ -248,7 +277,9 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                 host = host, onHostChange = { host = it },
                 nickname = nickname, onNicknameChange = { nickname = it },
                 seats = createSeats, onSeatsChange = { createSeats = it },
+                isPrivate = isPrivate, onPrivateChange = { isPrivate = it },
                 joinCode = joinCode, onJoinCodeChange = { joinCode = it },
+                roomList = roomList,
                 customLevel = customLevel,
                 onCreate = {
                     banner = null
@@ -260,7 +291,8 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         level = customLevel
                             ?: Level.rectangular("p", "pickup", 6, 9),
                         seats = createSeats,
-                        nickname = nickname.ifBlank { "Player" }
+                        nickname = nickname.ifBlank { "Player" },
+                        isPrivate = isPrivate
                     )
                 },
                 onJoin = {
@@ -273,6 +305,18 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                         code = joinCode.filter { it.isDigit() }.take(6),
                         nickname = nickname.ifBlank { "Player" }
                     )
+                },
+                onWatch = { code ->
+                    banner = null
+                    settings.putString(SettingKeys.RELAY_URL, host)
+                    client.connect(host)
+                    suspendSendWatch(client = client, code = code)
+                },
+                onRefreshRooms = {
+                    roomList = null
+                    settings.putString(SettingKeys.RELAY_URL, host)
+                    client.connect(host)
+                    suspendSendListRooms(client = client)
                 },
                 onBack = { nav.back() }
             )
@@ -367,6 +411,39 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     resetToIdle()
                 }
             )
+
+            is Stage.Watching -> {
+                WatchingPanel(
+                    code = s.code,
+                    players = players,
+                    maxSeats = s.maxSeats,
+                    state = s.state,
+                    displayBoard = if (s.state != null) (displayBoard ?: s.state.board) else null,
+                    lastMove = lastMove,
+                    explodingAtoms = explodingAtoms,
+                    onLeave = {
+                        client.send(ClientMessage.LeaveRoom)
+                        client.disconnect()
+                        resetToIdle()
+                    }
+                )
+                ChatPanel(
+                    lines = chatLines,
+                    draft = chatDraft,
+                    selfSeat = seat,
+                    unreadCount = unreadChat,
+                    onDraftChange = { chatDraft = it },
+                    onSend = {
+                        val text = chatDraft.trim()
+                        if (text.isNotEmpty()) {
+                            client.send(ClientMessage.Chat(text))
+                            chatDraft = ""
+                            chatSeenCount = chatLines.size + 1
+                        }
+                    },
+                    onRead = { chatSeenCount = chatLines.size }
+                )
+            }
         }
     }
 }
@@ -392,10 +469,14 @@ private fun IdlePanel(
     host: String, onHostChange: (String) -> Unit,
     nickname: String, onNicknameChange: (String) -> Unit,
     seats: Int, onSeatsChange: (Int) -> Unit,
+    isPrivate: Boolean, onPrivateChange: (Boolean) -> Unit,
     joinCode: String, onJoinCodeChange: (String) -> Unit,
+    roomList: List<RoomInfo>?,
     customLevel: Level?,
     onCreate: () -> Unit,
     onJoin: () -> Unit,
+    onWatch: (String) -> Unit,
+    onRefreshRooms: () -> Unit,
     onBack: () -> Unit
 ) {
     OutlinedTextField(
@@ -434,12 +515,22 @@ private fun IdlePanel(
             )
         }
     }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        androidx.compose.material3.Checkbox(
+            checked = isPrivate,
+            onCheckedChange = onPrivateChange
+        )
+        Text(stringResource(Res.string.online_private_room_hint))
+    }
     Button(onClick = onCreate, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(Res.string.online_create_room_btn, seats))
     }
 
     Spacer(Modifier.height(4.dp))
-    Text(stringResource(Res.string.label_join_room), fontWeight = FontWeight.Bold)
+    Text(stringResource(Res.string.label_join_room_by_code), fontWeight = FontWeight.Bold)
     OutlinedTextField(
         value = joinCode,
         onValueChange = { onJoinCodeChange(it.filter { c -> c.isDigit() }.take(6)) },
@@ -452,6 +543,51 @@ private fun IdlePanel(
         enabled = joinCode.length == 6,
         modifier = Modifier.fillMaxWidth()
     ) { Text(stringResource(Res.string.btn_join)) }
+
+    Spacer(Modifier.height(4.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(stringResource(Res.string.label_public_rooms), fontWeight = FontWeight.Bold)
+        OutlinedButton(onClick = onRefreshRooms) { Text(stringResource(Res.string.btn_refresh)) }
+    }
+    when {
+        roomList == null -> Text(stringResource(Res.string.online_rooms_hint_refresh), color = Color.Gray)
+        roomList.isEmpty() -> Text(stringResource(Res.string.online_rooms_empty), color = Color.Gray)
+        else -> roomList.forEach { room ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1A1D21))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(room.code, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (room.inProgress)
+                            stringResource(Res.string.online_room_in_progress, room.playerCount, room.maxSeats)
+                        else
+                            stringResource(Res.string.online_room_waiting, room.playerCount, room.maxSeats),
+                        color = if (room.inProgress) Color(0xFF66BB6A) else Color(0xFFFDD835),
+                        fontSize = 12.sp
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!room.inProgress) {
+                        OutlinedButton(
+                            onClick = { onJoinCodeChange(room.code); onJoin() }
+                        ) { Text(stringResource(Res.string.btn_join)) }
+                    }
+                    Button(onClick = { onWatch(room.code) }) { Text(stringResource(Res.string.btn_watch)) }
+                }
+            }
+        }
+    }
 
     Spacer(Modifier.height(4.dp))
     OutlinedButton(onClick = onBack) { Text(stringResource(Res.string.btn_back)) }
@@ -739,6 +875,69 @@ private fun ChatPanel(
     }
 }
 
+@Composable
+private fun WatchingPanel(
+    code: String,
+    players: List<Player>,
+    maxSeats: Int,
+    state: GameState?,
+    displayBoard: Board?,
+    lastMove: Pos?,
+    explodingAtoms: List<ExplodingAtom>,
+    onLeave: () -> Unit
+) {
+    Text(stringResource(Res.string.online_watching_room, code), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+
+    if (state == null) {
+        // Pre-game: show who's in the room waiting for game to start.
+        Text(
+            stringResource(Res.string.online_watching_waiting, players.size, maxSeats),
+            color = Color.Gray
+        )
+        players.forEach { p ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .padding(end = 8.dp)
+                        .width(14.dp).height(14.dp)
+                        .clip(CircleShape)
+                        .background(Color(p.color.toInt()))
+                )
+                Text(p.name)
+            }
+        }
+    } else {
+        // In-game: show the board read-only.
+        val render = remember(state, displayBoard) { state.copy(board = displayBoard ?: state.board) }
+        val turn = state.currentPlayer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(stringResource(Res.string.online_spectating), color = Color.Gray)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(
+                    Modifier
+                        .width(14.dp).height(14.dp)
+                        .clip(CircleShape)
+                        .background(Color(turn.color.toInt()))
+                )
+                Text(stringResource(Res.string.online_turn, turn.name), color = Color.Gray)
+            }
+        }
+        BoardView(
+            state = render,
+            onCellTap = {},
+            lastMove = lastMove,
+            explodingAtoms = explodingAtoms,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    OutlinedButton(onClick = onLeave) { Text(stringResource(Res.string.btn_stop_watching)) }
+}
+
 /** Spawns a coroutine on [MatchClientHolder.instance]'s own scope (via its
  *  [send] / [connect] lambdas) that waits for a Connected link then fires the
  *  CreateRoom request. Kept out of the composable body so scope ownership is
@@ -747,7 +946,8 @@ private fun suspendSendCreate(
     client: dev.atomic.app.online.MatchClient,
     level: Level,
     seats: Int,
-    nickname: String
+    nickname: String,
+    isPrivate: Boolean = false
 ) {
     client.scheduleAfterConnect {
         send(
@@ -755,7 +955,8 @@ private fun suspendSendCreate(
                 level = level,
                 settings = GameSettings(),
                 seats = seats,
-                nickname = nickname
+                nickname = nickname,
+                isPrivate = isPrivate
             )
         )
     }
@@ -768,5 +969,20 @@ private fun suspendSendJoin(
 ) {
     client.scheduleAfterConnect {
         send(ClientMessage.JoinRoom(code = code, nickname = nickname))
+    }
+}
+
+private fun suspendSendWatch(
+    client: dev.atomic.app.online.MatchClient,
+    code: String
+) {
+    client.scheduleAfterConnect {
+        send(ClientMessage.WatchRoom(code = code))
+    }
+}
+
+private fun suspendSendListRooms(client: dev.atomic.app.online.MatchClient) {
+    client.scheduleAfterConnect {
+        send(ClientMessage.ListRooms)
     }
 }

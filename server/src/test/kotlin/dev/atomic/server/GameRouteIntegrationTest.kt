@@ -52,11 +52,12 @@ class GameRouteIntegrationTest {
         send(Frame.Text(m.encode()))
     }
 
-    private fun defaultCreateRoom(nickname: String = "alice") = ClientMessage.CreateRoom(
+    private fun defaultCreateRoom(nickname: String = "alice", isPrivate: Boolean = false) = ClientMessage.CreateRoom(
         level = Level.rectangular("r", "r", 3, 3),
         settings = GameSettings(),
         seats = 2,
-        nickname = nickname
+        nickname = nickname,
+        isPrivate = isPrivate
     )
 
     @Test
@@ -273,6 +274,153 @@ class GameRouteIntegrationTest {
         // then — the server replies BadRequest instead of disconnecting
         assertEquals(ErrorCode.BadRequest, err.code)
         s.close()
+    }
+
+    @Test
+    fun listRoomsReturnsOnlyPublicRooms() = testApplication {
+        // given — two rooms: one public, one private
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host1 = wsClient.webSocketSession(urlString = "/game")
+        val host2 = wsClient.webSocketSession(urlString = "/game")
+        host1.sendMsg(defaultCreateRoom("alice", isPrivate = false))
+        val publicCode = host1.expectOf<ServerMessage.RoomCreated>().code
+        host2.sendMsg(defaultCreateRoom("bob", isPrivate = true))
+        host2.expectOf<ServerMessage.RoomCreated>()
+
+        // when — a third client requests the room list
+        val observer = wsClient.webSocketSession(urlString = "/game")
+        observer.sendMsg(ClientMessage.ListRooms)
+        val list = observer.expectOf<ServerMessage.RoomList>()
+
+        // then — only the public room appears; private room is excluded
+        assertEquals(1, list.rooms.size)
+        assertEquals(publicCode, list.rooms[0].code)
+        assertEquals(false, list.rooms[0].inProgress)
+
+        host1.close(); host2.close(); observer.close()
+    }
+
+    @Test
+    fun listRoomsShowsInProgressRoom() = testApplication {
+        // given — a two-player room where a game has started
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host = wsClient.webSocketSession(urlString = "/game")
+        val guest = wsClient.webSocketSession(urlString = "/game")
+        host.sendMsg(defaultCreateRoom("alice"))
+        val code = host.expectOf<ServerMessage.RoomCreated>().code
+        guest.sendMsg(ClientMessage.JoinRoom(code, "bob"))
+        guest.expectOf<ServerMessage.RoomJoined>()
+        host.expectOf<ServerMessage.PlayerJoined>()
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        guest.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        host.expectOf<ServerMessage.GameStarted>()
+        guest.expectOf<ServerMessage.GameStarted>()
+
+        // when — an observer requests the room list
+        val observer = wsClient.webSocketSession(urlString = "/game")
+        observer.sendMsg(ClientMessage.ListRooms)
+        val list = observer.expectOf<ServerMessage.RoomList>()
+
+        // then — the room appears with inProgress = true
+        val info = list.rooms.firstOrNull { it.code == code }
+        assertTrue(info != null, "in-progress room should appear in lobby list")
+        assertEquals(true, info.inProgress)
+        assertEquals(2, info.playerCount)
+
+        host.close(); guest.close(); observer.close()
+    }
+
+    @Test
+    fun spectatorReceivesGameUpdates() = testApplication {
+        // given — a game in progress
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host = wsClient.webSocketSession(urlString = "/game")
+        val guest = wsClient.webSocketSession(urlString = "/game")
+        host.sendMsg(defaultCreateRoom("alice"))
+        val code = host.expectOf<ServerMessage.RoomCreated>().code
+        guest.sendMsg(ClientMessage.JoinRoom(code, "bob"))
+        guest.expectOf<ServerMessage.RoomJoined>()
+        host.expectOf<ServerMessage.PlayerJoined>()
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        guest.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        val started = host.expectOf<ServerMessage.GameStarted>()
+        guest.expectOf<ServerMessage.GameStarted>()
+
+        // when — a spectator joins after the game starts
+        val watcher = wsClient.webSocketSession(urlString = "/game")
+        watcher.sendMsg(ClientMessage.WatchRoom(code))
+        val watchStarted = watcher.expectOf<ServerMessage.WatchStarted>()
+
+        // then — spectator receives the current game state
+        assertEquals(code, watchStarted.code)
+        assertEquals(2, watchStarted.maxSeats)
+        assertTrue(watchStarted.state != null, "spectator should receive current game state")
+
+        // when — host makes a move
+        host.sendMsg(ClientMessage.MakeMove(Pos(0, 0)))
+        host.expectOf<ServerMessage.GameUpdated>()
+        guest.expectOf<ServerMessage.GameUpdated>()
+        val watcherUpd = watcher.expectOf<ServerMessage.GameUpdated>()
+
+        // then — spectator also receives the update
+        assertEquals(Pos(0, 0), watcherUpd.lastMove)
+        assertEquals(0, watcherUpd.bySeat)
+
+        host.close(); guest.close(); watcher.close()
+    }
+
+    @Test
+    fun spectatorCanWatchPreGameLobbyAndSeeGameStart() = testApplication {
+        // given — a room that hasn't started yet
+        application { module() }
+        val wsClient = createClient { install(WebSockets) }
+        val host = wsClient.webSocketSession(urlString = "/game")
+        host.sendMsg(defaultCreateRoom("alice"))
+        val code = host.expectOf<ServerMessage.RoomCreated>().code
+
+        // when — a spectator joins the waiting room
+        val watcher = wsClient.webSocketSession(urlString = "/game")
+        watcher.sendMsg(ClientMessage.WatchRoom(code))
+        val watchStarted = watcher.expectOf<ServerMessage.WatchStarted>()
+
+        // then — spectator receives lobby state without a game state yet
+        assertEquals(code, watchStarted.code)
+        assertEquals(null, watchStarted.state)
+        assertEquals(1, watchStarted.players.size)
+
+        // when — a guest joins and both players ready up
+        val guest = wsClient.webSocketSession(urlString = "/game")
+        guest.sendMsg(ClientMessage.JoinRoom(code, "bob"))
+        guest.expectOf<ServerMessage.RoomJoined>()
+        host.expectOf<ServerMessage.PlayerJoined>()
+        watcher.expectOf<ServerMessage.PlayerJoined>()
+        host.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        watcher.expectOf<ServerMessage.PlayerReady>()
+        guest.sendMsg(ClientMessage.SetReady)
+        host.expectOf<ServerMessage.PlayerReady>()
+        guest.expectOf<ServerMessage.PlayerReady>()
+        watcher.expectOf<ServerMessage.PlayerReady>()
+        host.expectOf<ServerMessage.GameStarted>()
+        guest.expectOf<ServerMessage.GameStarted>()
+        val watcherStarted = watcher.expectOf<ServerMessage.GameStarted>()
+
+        // then — spectator receives GameStarted broadcast
+        assertEquals(0, watcherStarted.state.currentPlayerIndex)
+
+        host.close(); guest.close(); watcher.close()
     }
 
     @Test

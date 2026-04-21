@@ -8,6 +8,7 @@ import dev.atomic.shared.engine.PlayerKind
 import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
 import dev.atomic.shared.net.ErrorCode
+import dev.atomic.shared.net.RoomInfo
 import dev.atomic.shared.net.ServerMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
@@ -36,7 +38,8 @@ class RoomManager(
         settings: GameSettings,
         seats: Int,
         host: Session,
-        nickname: String
+        nickname: String,
+        isPrivate: Boolean = false
     ): Room? {
         require(seats in 2..4)
         if (rooms.size >= maxRooms) {
@@ -44,7 +47,7 @@ class RoomManager(
             return null
         }
         val code = newCode()
-        val room = Room(code, level, settings, seats)
+        val room = Room(code, level, settings, seats, isPrivate)
         rooms[code] = room
         val seat = room.admit(host, nickname)
         host.send(ServerMessage.RoomCreated(code, seat!!, room.players, room.maxSeats))
@@ -86,6 +89,31 @@ class RoomManager(
         return true
     }
 
+    /**
+     * Attaches [session] to [code] as a spectator. Spectators receive all
+     * subsequent broadcasts but hold no seat and cannot make moves. Returns
+     * true iff the room exists (private rooms can still be watched by code).
+     * Rejects the request if the session is already attached to any room.
+     */
+    suspend fun watch(code: String, session: Session): Boolean {
+        if (session.currentRoom != null) {
+            session.send(ServerMessage.ErrorMessage(ErrorCode.BadRequest, "leave your current room before watching another"))
+            return false
+        }
+        val room = rooms[code] ?: return false
+        val state = room.currentState()
+        room.admitSpectator(session)
+        session.send(ServerMessage.WatchStarted(room.code, room.players, room.maxSeats, state))
+        return true
+    }
+
+    /** Returns info for all non-private rooms (both waiting and in-progress). */
+    suspend fun listPublicRooms(): List<RoomInfo> =
+        rooms.values
+            .filter { !it.isPrivate }
+            .map { room -> room.infoSnapshot() }
+            .sortedBy { it.code }
+
     fun evict(room: Room) {
         if (rooms.remove(room.code, room)) room.close()
     }
@@ -102,15 +130,19 @@ class Room(
     val code: String,
     val level: Level,
     val settings: GameSettings,
-    val maxSeats: Int
+    val maxSeats: Int,
+    val isPrivate: Boolean = false
 ) {
     private val mutex = Mutex()
     private val occupants = mutableMapOf<Int, Occupant>()
+    private val spectators = CopyOnWriteArrayList<Session>()
     private var state: GameState? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile var lastActivityAt: Long = System.currentTimeMillis()
         private set
+
+    val isInProgress: Boolean get() = state != null
 
     private fun touch() {
         lastActivityAt = System.currentTimeMillis()
@@ -147,6 +179,38 @@ class Room(
         session.attach(this, seat)
         touch()
         seat
+    }
+
+    /** Adds [session] as a spectator without occupying a seat. */
+    fun admitSpectator(session: Session) {
+        spectators.add(session)
+        session.attachAsSpectator(this)
+    }
+
+    /** Removes [session] from the spectators list. */
+    fun removeSpectator(session: Session) {
+        spectators.remove(session)
+        session.detach()
+    }
+
+    /**
+     * Detaches and clears all currently attached spectators.
+     * Called when the room is closed/evicted so spectators are not left stuck.
+     */
+    fun detachAllSpectators() {
+        val snapshot = spectators.toList()
+        spectators.clear()
+        snapshot.forEach { it.detach() }
+    }
+
+    /** Returns a consistent [RoomInfo] snapshot read under [mutex]. */
+    suspend fun infoSnapshot(): RoomInfo = mutex.withLock {
+        RoomInfo(
+            code = code,
+            playerCount = occupants.size,
+            maxSeats = maxSeats,
+            inProgress = state != null
+        )
     }
 
     /**
@@ -285,6 +349,7 @@ class Room(
     }
 
     fun close() {
+        detachAllSpectators()
         scope.cancel()
     }
 
@@ -294,10 +359,12 @@ class Room(
 
     private suspend fun broadcast(message: ServerMessage) {
         occupants.values.forEach { it.session?.send(message) }
+        spectators.forEach { it.send(message) }
     }
 
     private suspend fun broadcastExcept(seat: Int, message: ServerMessage) {
         occupants.forEach { (s, occ) -> if (s != seat) occ.session?.send(message) }
+        spectators.forEach { it.send(message) }
     }
 
     companion object {
