@@ -4,7 +4,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Unique ID injected into sw.js on every build so the Service Worker cache
 // is automatically invalidated on each deploy (rolling release).
-val buildId: String = System.currentTimeMillis().toString()
+// Sourced from GITHUB_SHA on CI; falls back to "local-dev" for local builds
+// (deterministic so Gradle's build cache remains effective locally).
+val buildId: String = System.getenv("GITHUB_SHA") ?: "local-dev"
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -112,6 +114,9 @@ compose.desktop {
 // each CI build produces a unique Service Worker, automatically busting the
 // asset cache without any manual version bumps.
 tasks.named<Copy>("wasmJsProcessResources") {
+    // Declare buildId as an explicit task input so Gradle's up-to-date check
+    // and build cache key include it; the task re-runs whenever the SHA changes.
+    inputs.property("buildId", buildId)
     filesMatching("sw.js") {
         filter { line -> line.replace("%%BUILD_ID%%", buildId) }
     }

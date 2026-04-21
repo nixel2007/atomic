@@ -28,7 +28,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key.startsWith('atomic-') && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
@@ -64,7 +64,14 @@ self.addEventListener('fetch', (event) => {
         } catch {
           const cached = await cache.match(request);
           if (cached) return cached;
-          throw new Error('Unable to load page. Please check your connection and try again.');
+          return new Response(
+            'Unable to load page. Please check your connection and try again.',
+            {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            }
+          );
         }
       })
     );
