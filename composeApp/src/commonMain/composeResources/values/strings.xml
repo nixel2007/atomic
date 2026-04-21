@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_subtitle">Chain Reaction</string>
+
+    <!-- Main menu -->
+    <string name="menu_hot_seat">Hot seat</string>
+    <string name="menu_vs_ai">Vs AI</string>
+    <string name="menu_online">Online</string>
+    <string name="menu_level_editor">Level editor</string>
+    <string name="menu_how_to_play">How to play</string>
+
+    <!-- Screen titles -->
+    <string name="screen_online">Online</string>
+    <string name="screen_editor">Level editor</string>
+    <string name="screen_help">How to Play</string>
+
+    <!-- Labels -->
+    <string name="label_players">Players</string>
+    <string name="label_board_size">Board size</string>
+    <string name="label_explosions">Explosions</string>
+    <string name="label_bot_difficulty">Bot difficulty</string>
+    <string name="label_size">Size</string>
+    <string name="label_mode">Mode</string>
+    <string name="label_server_url">Server URL</string>
+    <string name="label_nickname">Nickname</string>
+    <string name="label_create_room">Create room</string>
+    <string name="label_join_room">Join room</string>
+    <string name="label_join_code">6-digit code</string>
+    <string name="label_room_code">Room code</string>
+    <string name="label_chat">Chat</string>
+
+    <!-- Buttons -->
+    <string name="btn_back">Back</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_play_again">Play again</string>
+    <string name="btn_back_to_menu">Back to menu</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_clear">Clear</string>
+    <string name="btn_play">Play</string>
+    <string name="btn_play_online">Play online</string>
+    <string name="btn_join">Join</string>
+    <string name="btn_cancel_ready">Cancel ready</string>
+    <string name="btn_im_ready">I\'m ready</string>
+    <string name="btn_leave">Leave</string>
+    <string name="btn_leave_room">Leave room</string>
+    <string name="btn_back_to_lobby">Back to lobby</string>
+    <string name="btn_send">Send</string>
+
+    <!-- Mode names -->
+    <string name="mode_vs_bot">Vs bot</string>
+
+    <!-- Explosion modes -->
+    <string name="explosion_mode_wave">Wave</string>
+    <string name="explosion_mode_recursive">Recursive</string>
+
+    <!-- Bot difficulty levels -->
+    <string name="bot_difficulty_easy">Easy</string>
+    <string name="bot_difficulty_medium">Medium</string>
+    <string name="bot_difficulty_hard">Hard</string>
+
+    <!-- Game -->
+    <string name="game_winner">%1$s wins!</string>
+    <string name="game_final_turn_count">Final turn count: %1$d</string>
+    <string name="game_players_eliminated">Players eliminated: %1$d</string>
+    <string name="game_turn">turn %1$d</string>
+    <string name="game_player_out">(out)</string>
+    <string name="player_bot_name">Bot %1$d</string>
+    <string name="player_human_name">P%1$d</string>
+
+    <!-- Help screen tabs -->
+    <string name="help_tab_placement">Placement</string>
+    <string name="help_tab_critical_mass">Critical Mass</string>
+    <string name="help_tab_capture">Capture</string>
+    <string name="help_tab_victory">Victory</string>
+
+    <!-- Help screen content -->
+    <string name="help_placement_headline">Placing an Atom</string>
+    <string name="help_placement_desc">On your turn tap any empty cell or a cell you already own to place one atom there. You cannot place on a cell owned by another player.</string>
+    <string name="help_critical_mass_headline">Critical Mass &amp; Explosion</string>
+    <string name="help_critical_mass_desc">Each cell has a critical mass equal to its number of neighbours: 2 for corners, 3 for edges, and 4 for interior cells. When a cell reaches its critical mass it explodes — losing all its atoms, which fly outward to every neighbouring cell.</string>
+    <string name="help_capture_headline">Capturing Cells</string>
+    <string name="help_capture_desc">Atoms that fly out of an explosion always carry the owner\'s colour. If they land on a cell owned by a different player, that cell and its atoms are immediately converted to the attacker\'s colour — and a chain reaction can follow!</string>
+    <string name="help_victory_headline">Victory</string>
+    <string name="help_victory_desc">The last player who still has atoms on the board wins. A player is eliminated the moment all of their atoms are captured. Games support 2 to 4 players — the more players, the more chain reactions!</string>
+
+    <!-- Level editor -->
+    <string name="editor_hint">Tap a cell to toggle it blocked. Critical mass updates automatically.</string>
+    <string name="editor_cm_sample">Critical mass sample: centre = %1$d, corner = %2$d</string>
+
+    <!-- Online status -->
+    <string name="status_not_connected">not connected</string>
+    <string name="status_connecting">connecting…</string>
+    <string name="status_connected">connected</string>
+    <string name="status_reconnecting">reconnecting…</string>
+    <string name="status_disconnected">disconnected</string>
+    <string name="status_failed">failed: %1$s</string>
+    <string name="status_failed_default">connection error</string>
+
+    <!-- Online screen -->
+    <string name="online_custom_level">Using your custom %1$dx%2$d level (%3$d blocked).</string>
+    <string name="online_seats_chip">%1$d seats</string>
+    <string name="online_create_room_btn">Create %1$d-seat room</string>
+    <string name="online_share_code_hint">Share this code with friends. Game starts when everyone is ready.</string>
+    <string name="online_seats_status">Seats (%1$d/%2$d) — %3$d/%4$d ready</string>
+    <string name="online_you">(you)</string>
+    <string name="online_ready">ready</string>
+    <string name="online_waiting">waiting</string>
+    <string name="online_your_turn">your turn</string>
+    <string name="online_turn">turn: %1$s</string>
+    <string name="online_you_name">you: %1$s</string>
+    <string name="online_player_left">%1$s left</string>
+    <string name="online_player_disconnected">%1$s lost connection (%2$ds to rejoin)</string>
+    <string name="online_player_rejoined">%1$s reconnected</string>
+    <string name="online_seat_fallback">seat %1$d</string>
+    <string name="online_private_room_hint">Private room (won\'t appear in lobby list)</string>
+    <string name="online_room_in_progress">In progress · %1$d/%2$d</string>
+    <string name="online_room_waiting">Waiting · %1$d/%2$d</string>
+    <string name="online_rooms_hint_refresh">Press Refresh to load the room list.</string>
+    <string name="online_rooms_empty">No public rooms at the moment.</string>
+    <string name="online_watching_room">Watching room %1$s</string>
+    <string name="online_watching_waiting">Waiting for game to start (%1$d/%2$d players)…</string>
+    <string name="online_spectating">Spectating</string>
+
+    <!-- Labels -->
+    <string name="label_join_room_by_code">Join room by code</string>
+    <string name="label_public_rooms">Public rooms</string>
+
+    <!-- Buttons -->
+    <string name="btn_refresh">Refresh</string>
+    <string name="btn_watch">Watch</string>
+    <string name="btn_stop_watching">Stop watching</string>
+
+    <!-- Chat -->
+    <string name="chat_new_count">↓ %1$d new</string>
+    <string name="chat_empty">No messages yet.</string>
+    <string name="chat_placeholder">Say something…</string>
+</resources>

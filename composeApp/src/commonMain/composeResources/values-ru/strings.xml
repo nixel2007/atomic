@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_subtitle">Цепная реакция</string>
+
+    <!-- Main menu -->
+    <string name="menu_hot_seat">Совместная игра</string>
+    <string name="menu_vs_ai">Против ИИ</string>
+    <string name="menu_online">Онлайн</string>
+    <string name="menu_level_editor">Редактор уровней</string>
+    <string name="menu_how_to_play">Как играть</string>
+
+    <!-- Screen titles -->
+    <string name="screen_online">Онлайн</string>
+    <string name="screen_editor">Редактор уровней</string>
+    <string name="screen_help">Как играть</string>
+
+    <!-- Labels -->
+    <string name="label_players">Игроки</string>
+    <string name="label_board_size">Размер доски</string>
+    <string name="label_explosions">Взрывы</string>
+    <string name="label_bot_difficulty">Сложность бота</string>
+    <string name="label_size">Размер</string>
+    <string name="label_mode">Режим</string>
+    <string name="label_server_url">Адрес сервера</string>
+    <string name="label_nickname">Никнейм</string>
+    <string name="label_create_room">Создать комнату</string>
+    <string name="label_join_room">Войти в комнату</string>
+    <string name="label_join_code">6-значный код</string>
+    <string name="label_room_code">Код комнаты</string>
+    <string name="label_chat">Чат</string>
+
+    <!-- Buttons -->
+    <string name="btn_back">Назад</string>
+    <string name="btn_start">Начать</string>
+    <string name="btn_play_again">Играть снова</string>
+    <string name="btn_back_to_menu">В меню</string>
+    <string name="btn_close">Закрыть</string>
+    <string name="btn_clear">Очистить</string>
+    <string name="btn_play">Играть</string>
+    <string name="btn_play_online">Играть онлайн</string>
+    <string name="btn_join">Войти</string>
+    <string name="btn_cancel_ready">Отменить готовность</string>
+    <string name="btn_im_ready">Я готов</string>
+    <string name="btn_leave">Выйти</string>
+    <string name="btn_leave_room">Покинуть комнату</string>
+    <string name="btn_back_to_lobby">В лобби</string>
+    <string name="btn_send">Отправить</string>
+
+    <!-- Mode names -->
+    <string name="mode_vs_bot">Против бота</string>
+
+    <!-- Explosion modes -->
+    <string name="explosion_mode_wave">Волна</string>
+    <string name="explosion_mode_recursive">Рекурсивный</string>
+
+    <!-- Bot difficulty levels -->
+    <string name="bot_difficulty_easy">Лёгкий</string>
+    <string name="bot_difficulty_medium">Средний</string>
+    <string name="bot_difficulty_hard">Сложный</string>
+
+    <!-- Game -->
+    <string name="game_winner">%1$s победил!</string>
+    <string name="game_final_turn_count">Всего ходов: %1$d</string>
+    <string name="game_players_eliminated">Выбыло игроков: %1$d</string>
+    <string name="game_turn">ход %1$d</string>
+    <string name="game_player_out">(выбыл)</string>
+    <string name="player_bot_name">Бот %1$d</string>
+    <string name="player_human_name">Игрок %1$d</string>
+
+    <!-- Help screen tabs -->
+    <string name="help_tab_placement">Размещение</string>
+    <string name="help_tab_critical_mass">Критическая масса</string>
+    <string name="help_tab_capture">Захват</string>
+    <string name="help_tab_victory">Победа</string>
+
+    <!-- Help screen content -->
+    <string name="help_placement_headline">Размещение атома</string>
+    <string name="help_placement_desc">В свой ход нажмите на любую пустую клетку или на клетку, которую вы уже занимаете, чтобы разместить там атом. Нельзя размещать атом на клетке другого игрока.</string>
+    <string name="help_critical_mass_headline">Критическая масса и взрыв</string>
+    <string name="help_critical_mass_desc">У каждой клетки есть критическая масса, равная числу её соседей: 2 для угловых, 3 для граничных и 4 для центральных клеток. Когда клетка достигает критической массы, она взрывается — все её атомы разлетаются по соседним клеткам.</string>
+    <string name="help_capture_headline">Захват клеток</string>
+    <string name="help_capture_desc">Атомы, вылетевшие при взрыве, сохраняют цвет владельца. Если они попадают на клетку другого игрока, та клетка вместе с атомами немедленно переходит к атакующему — и может начаться цепная реакция!</string>
+    <string name="help_victory_headline">Победа</string>
+    <string name="help_victory_desc">Побеждает последний игрок, у которого остались атомы на доске. Игрок выбывает в тот момент, когда все его атомы захвачены. В игре участвуют от 2 до 4 игроков — чем больше игроков, тем больше цепных реакций!</string>
+
+    <!-- Level editor -->
+    <string name="editor_hint">Нажмите на клетку, чтобы заблокировать или разблокировать её. Критическая масса обновляется автоматически.</string>
+    <string name="editor_cm_sample">Критическая масса: центр = %1$d, угол = %2$d</string>
+
+    <!-- Online status -->
+    <string name="status_not_connected">нет соединения</string>
+    <string name="status_connecting">подключение…</string>
+    <string name="status_connected">подключено</string>
+    <string name="status_reconnecting">переподключение…</string>
+    <string name="status_disconnected">отключено</string>
+    <string name="status_failed">ошибка: %1$s</string>
+    <string name="status_failed_default">ошибка соединения</string>
+
+    <!-- Online screen -->
+    <string name="online_custom_level">Используется ваш уровень %1$d×%2$d (%3$d заблокировано).</string>
+    <string name="online_seats_chip">%1$d игрока</string>
+    <string name="online_create_room_btn">Создать комнату на %1$d</string>
+    <string name="online_share_code_hint">Поделитесь кодом с друзьями. Игра начнётся, когда все будут готовы.</string>
+    <string name="online_seats_status">Места (%1$d/%2$d) — %3$d/%4$d готовы</string>
+    <string name="online_you">(вы)</string>
+    <string name="online_ready">готов</string>
+    <string name="online_waiting">ожидает</string>
+    <string name="online_your_turn">ваш ход</string>
+    <string name="online_turn">ход: %1$s</string>
+    <string name="online_you_name">вы: %1$s</string>
+    <string name="online_player_left">%1$s вышел</string>
+    <string name="online_player_disconnected">%1$s потерял соединение (%2$d сек на переподключение)</string>
+    <string name="online_player_rejoined">%1$s переподключился</string>
+    <string name="online_seat_fallback">место %1$d</string>
+    <string name="online_private_room_hint">Приватная комната (не будет видна в списке)</string>
+    <string name="online_room_in_progress">Игра идёт · %1$d/%2$d</string>
+    <string name="online_room_waiting">Ожидание · %1$d/%2$d</string>
+    <string name="online_rooms_hint_refresh">Нажмите «Обновить», чтобы загрузить список комнат.</string>
+    <string name="online_rooms_empty">Публичных комнат нет.</string>
+    <string name="online_watching_room">Наблюдение: комната %1$s</string>
+    <string name="online_watching_waiting">Ожидание начала игры (%1$d/%2$d игроков)…</string>
+    <string name="online_spectating">Наблюдатель</string>
+
+    <!-- Labels -->
+    <string name="label_join_room_by_code">Войти по коду</string>
+    <string name="label_public_rooms">Публичные комнаты</string>
+
+    <!-- Buttons -->
+    <string name="btn_refresh">Обновить</string>
+    <string name="btn_watch">Смотреть</string>
+    <string name="btn_stop_watching">Прекратить наблюдение</string>
+
+    <!-- Chat -->
+    <string name="chat_new_count">↓ %1$d новых</string>
+    <string name="chat_empty">Пока нет сообщений.</string>
+    <string name="chat_placeholder">Написать…</string>
+</resources>

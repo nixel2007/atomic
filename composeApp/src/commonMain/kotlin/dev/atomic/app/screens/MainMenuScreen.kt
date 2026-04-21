@@ -15,9 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import atomic.composeapp.generated.resources.*
 import dev.atomic.app.GameMode
 import dev.atomic.app.Navigator
 import dev.atomic.app.Screen
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun MainMenuScreen(nav: Navigator) {
@@ -27,13 +29,13 @@ fun MainMenuScreen(nav: Navigator) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Atomic", fontSize = 48.sp, fontWeight = FontWeight.Bold)
-        Text("Chain Reaction", fontSize = 16.sp)
+        Text(stringResource(Res.string.app_subtitle), fontSize = 16.sp)
         Spacer(Modifier.height(48.dp))
-        MenuButton("Hot seat") { nav.go(Screen.Setup(GameMode.HotSeat)) }
-        MenuButton("Vs AI") { nav.go(Screen.Setup(GameMode.VsBot)) }
-        MenuButton("Online") { nav.go(Screen.Online()) }
-        MenuButton("Level editor") { nav.go(Screen.Editor) }
-        MenuButton("How to play") { nav.go(Screen.Help) }
+        MenuButton(stringResource(Res.string.menu_hot_seat)) { nav.go(Screen.Setup(GameMode.HotSeat)) }
+        MenuButton(stringResource(Res.string.menu_vs_ai)) { nav.go(Screen.Setup(GameMode.VsBot)) }
+        MenuButton(stringResource(Res.string.menu_online)) { nav.go(Screen.Online()) }
+        MenuButton(stringResource(Res.string.menu_level_editor)) { nav.go(Screen.Editor) }
+        MenuButton(stringResource(Res.string.menu_how_to_play)) { nav.go(Screen.Help) }
     }
 }
 
