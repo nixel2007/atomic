@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -188,6 +189,8 @@ class MatchClient {
                     }
                 }
                 false
+            } catch (e: CancellationException) {
+                throw e
             } catch (t: Throwable) {
                 session = null
                 _lastError.value = t.message ?: t::class.simpleName ?: "connection failed"
