@@ -78,3 +78,33 @@ jobs:
           path: atomic-windows.zip
           retention-days: 1
           if-no-files-found: error
+
+      - name: Build Linux/macOS ZIP distributable
+        if: matrix.name == 'Linux' || matrix.name == 'macOS'
+        run: ./gradlew :composeApp:createReleaseDistributable --no-daemon --stacktrace
+
+      - name: Pack Linux ZIP
+        if: matrix.name == 'Linux'
+        run: zip -r atomic-linux.zip composeApp/build/compose/binaries/main-release/app/
+
+      - name: Upload Linux ZIP distributable
+        if: matrix.name == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: atomic-desktop-linux-zip
+          path: atomic-linux.zip
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Pack macOS ZIP
+        if: matrix.name == 'macOS'
+        run: zip -r atomic-macos.zip composeApp/build/compose/binaries/main-release/app/
+
+      - name: Upload macOS ZIP distributable
+        if: matrix.name == 'macOS'
+        uses: actions/upload-artifact@v7
+        with:
+          name: atomic-desktop-macos-zip
+          path: atomic-macos.zip
+          retention-days: 1
+          if-no-files-found: error
