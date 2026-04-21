@@ -419,7 +419,6 @@ fun OnlineScreen(nav: Navigator, customLevel: Level? = null) {
                     maxSeats = s.maxSeats,
                     state = s.state,
                     displayBoard = if (s.state != null) (displayBoard ?: s.state.board) else null,
-                    animating = animating,
                     lastMove = lastMove,
                     explodingAtoms = explodingAtoms,
                     onLeave = {
@@ -883,7 +882,6 @@ private fun WatchingPanel(
     maxSeats: Int,
     state: GameState?,
     displayBoard: Board?,
-    animating: Boolean,
     lastMove: Pos?,
     explodingAtoms: List<ExplodingAtom>,
     onLeave: () -> Unit

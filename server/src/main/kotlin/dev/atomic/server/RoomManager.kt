@@ -93,8 +93,13 @@ class RoomManager(
      * Attaches [session] to [code] as a spectator. Spectators receive all
      * subsequent broadcasts but hold no seat and cannot make moves. Returns
      * true iff the room exists (private rooms can still be watched by code).
+     * Rejects the request if the session is already attached to any room.
      */
     suspend fun watch(code: String, session: Session): Boolean {
+        if (session.currentRoom != null) {
+            session.send(ServerMessage.ErrorMessage(ErrorCode.BadRequest, "leave your current room before watching another"))
+            return false
+        }
         val room = rooms[code] ?: return false
         val state = room.currentState()
         room.admitSpectator(session)
@@ -103,17 +108,10 @@ class RoomManager(
     }
 
     /** Returns info for all non-private rooms (both waiting and in-progress). */
-    fun listPublicRooms(): List<RoomInfo> =
+    suspend fun listPublicRooms(): List<RoomInfo> =
         rooms.values
             .filter { !it.isPrivate }
-            .map { room ->
-                RoomInfo(
-                    code = room.code,
-                    playerCount = room.players.size,
-                    maxSeats = room.maxSeats,
-                    inProgress = room.isInProgress
-                )
-            }
+            .map { room -> room.infoSnapshot() }
             .sortedBy { it.code }
 
     fun evict(room: Room) {
@@ -193,6 +191,26 @@ class Room(
     fun removeSpectator(session: Session) {
         spectators.remove(session)
         session.detach()
+    }
+
+    /**
+     * Detaches and clears all currently attached spectators.
+     * Called when the room is closed/evicted so spectators are not left stuck.
+     */
+    fun detachAllSpectators() {
+        val snapshot = spectators.toList()
+        spectators.clear()
+        snapshot.forEach { it.detach() }
+    }
+
+    /** Returns a consistent [RoomInfo] snapshot read under [mutex]. */
+    suspend fun infoSnapshot(): RoomInfo = mutex.withLock {
+        RoomInfo(
+            code = code,
+            playerCount = occupants.size,
+            maxSeats = maxSeats,
+            inProgress = state != null
+        )
     }
 
     /**
@@ -331,6 +349,7 @@ class Room(
     }
 
     fun close() {
+        detachAllSpectators()
         scope.cancel()
     }
 
