@@ -4,9 +4,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Unique ID injected into sw.js on every build so the Service Worker cache
 // is automatically invalidated on each deploy (rolling release).
-// Sourced from GITHUB_SHA on CI; falls back to "local-dev" for local builds
-// (deterministic so Gradle's build cache remains effective locally).
-val buildId: String = System.getenv("GITHUB_SHA") ?: "local-dev"
+// Derived from git state via me.qoomon.git-versioning:
+//   on a version tag  → the tag version (e.g. "1.2.3")
+//   on a branch       → "<branch-slug>-SNAPSHOT"
+//   detached HEAD     → the commit SHA
+val buildId: String = project.version.toString()
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
