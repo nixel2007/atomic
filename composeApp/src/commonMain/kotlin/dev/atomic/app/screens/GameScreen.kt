@@ -129,7 +129,7 @@ fun GameScreen(nav: Navigator, config: GameConfig) {
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp),
         contentAlignment = Alignment.TopCenter
     ) {
-        Column(modifier = Modifier.widthIn(max = MAX_GAME_SCREEN_WIDTH_DP.dp).fillMaxHeight()) {
+        Column(modifier = Modifier.widthIn(max = MAX_GAME_SCREEN_WIDTH_DP.dp).fillMaxWidth().fillMaxHeight()) {
             TurnBar(state)
             Spacer(Modifier.height(8.dp))
             BoardView(
@@ -195,7 +195,7 @@ private fun TurnBar(state: GameState) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             state.players.forEach { p ->
                 val dim = !p.active
                 val col = Color(p.color.toInt())

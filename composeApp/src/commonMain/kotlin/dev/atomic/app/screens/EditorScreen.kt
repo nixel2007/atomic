@@ -2,6 +2,8 @@ package dev.atomic.app.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +41,7 @@ import dev.atomic.shared.model.Level
 import dev.atomic.shared.model.Pos
 import org.jetbrains.compose.resources.stringResource
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditorScreen(nav: Navigator) {
     var width by remember { mutableStateOf(6) }
@@ -146,7 +149,7 @@ fun EditorScreen(nav: Navigator) {
         }
 
         Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.back() }) { Text(stringResource(Res.string.btn_back)) }
             OutlinedButton(onClick = { blocked = emptySet() }) { Text(stringResource(Res.string.btn_clear)) }
             Button(
